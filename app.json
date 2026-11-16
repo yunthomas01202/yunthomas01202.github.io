@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "학습지원",
+    "slug": "ultimate-study",
+    "scheme": "ultimatestudy",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.yourname.ultimatestudy",
+      "supportsTablet": true,
+      "requireFullScreen": false,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": []
+      }
+    },
+    "android": {
+      "package": "com.yourname.ultimatestudy",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "deploymentTarget": "16.0"
+          },
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#4F46E5"
+        }
+      ],
+      [
+        "react-native-device-activity",
+        {
+          "appleTeamId": "YOUR_APPLE_TEAM_ID",
+          "appGroup": "group.com.yourname.ultimatestudy"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "googleWebClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+      "firebaseWeb": {
+        "apiKey": "YOUR_API_KEY",
+        "authDomain": "YOUR_PROJECT.firebaseapp.com",
+        "projectId": "YOUR_PROJECT",
+        "storageBucket": "YOUR_PROJECT.firebasestorage.app",
+        "messagingSenderId": "000000000000",
+        "appId": "1:000000000000:web:xxxxxxxx"
+      }
+    },
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "name": "학습지원",
+      "shortName": "학습지원",
+      "themeColor": "#4F46E5",
+      "backgroundColor": "#F4F5FA"
+    }
+  }
+}

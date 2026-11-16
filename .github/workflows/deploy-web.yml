@@ -1,0 +1,53 @@
+name: 웹 배포 (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: GitHub Pages 설정 읽기
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: 고정된 패키지 설치
+        run: npm ci --no-audit --no-fund
+      - name: 타입 검사 및 배포 경로 테스트
+        run: |
+          npm run typecheck
+          npm run test:pages
+      - name: 웹 정적 빌드
+        env:
+          EXPO_BASE_URL: ${{ steps.pages.outputs.base_path }}
+        run: npm run build:pages
+      - name: 정적 사이트 업로드
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pages 배포
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,1302 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>study-engine</title>
+<style>
+  :root {
+    --bg: #E7E9F0; --bar: #FFFFFF; --ink: #161927; --sub: #5B6175; --line: #E2E5EE;
+    --pri: #4F46E5; --pri-soft: #ECEBFD; --danger: #E5484D; --ok: #30A46C;
+    --bar-h: 52px; --sub-h: 0px;
+    --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  body.dark { --bg: #0E1016; --bar: #171A23; --ink: #ECEEF5; --sub: #A3A9BC; --line: #2A2F3C; --pri: #8B85FF; --pri-soft: #25233F; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+  button { font-family: inherit; }
+
+  /* ── 상단 도구 막대 ── */
+  #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 60; background: var(--bar); border-bottom: 1px solid var(--line); padding-top: var(--safe-top); }
+  .row { display: flex; align-items: center; gap: 2px; padding: 6px 6px; overflow-x: auto; scrollbar-width: none; }
+  .row::-webkit-scrollbar { display: none; }
+  #subbar { display: none; border-top: 1px solid var(--line); }
+  #subbar.show { display: flex; }
+  .btn { flex: none; height: 38px; min-width: 38px; border: 0; background: transparent; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; color: var(--ink);
+    font-size: 13px; font-weight: 700; padding: 0 8px; cursor: pointer; }
+  .btn:active { background: var(--line); }
+  .btn.on { background: var(--pri-soft); color: var(--pri); }
+  .btn.red.on { background: #FDECEC; color: var(--danger); }
+  .btn[disabled] { opacity: .35; }
+  .btn svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .btn .lbl { font-size: 12px; }
+  .sep { flex: none; width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
+  .sw { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--bar); box-shadow: 0 0 0 1px var(--line); margin: 0 3px; cursor: pointer; }
+  .sw.on { box-shadow: 0 0 0 2.5px var(--ink); }
+  .wd { flex: none; width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .wd.on { background: var(--pri-soft); }
+  .wd i { display: block; border-radius: 99px; background: var(--ink); }
+  #title { flex: none; font-weight: 800; font-size: 14px; max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+  .range { flex: none; width: 90px; accent-color: var(--pri); }
+  .pill { flex: none; font-size: 12px; font-weight: 700; color: var(--sub); padding: 0 6px; white-space: nowrap; }
+
+  /* ── 보기 영역 ── */
+  #vp { position: fixed; left: 0; right: 0; bottom: 0; top: calc(var(--bar-h) + var(--sub-h)); overflow: auto; -webkit-overflow-scrolling: touch; }
+  #content { position: relative; padding: 14px 0 160px; margin: 0 auto; }
+  .page { position: relative; margin: 0 auto 14px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(20,24,40,.08); overflow: hidden; }
+  .surf { touch-action: none; }
+  .page canvas, .surf > canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  .page .pdf { z-index: 0; }
+  .page .bgtpl { position: absolute; inset: 0; z-index: 0; }
+  .page .ink, .surf .ink { z-index: 3; pointer-events: none; mix-blend-mode: multiply; }
+  .page .overlay { z-index: 4; pointer-events: none; opacity: .45; mix-blend-mode: multiply; }
+  .page .pnum { position: absolute; right: 8px; bottom: 6px; font-size: 10px; color: #9AA0B2; z-index: 5; pointer-events: none; }
+  #live { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 6; pointer-events: none; }
+
+  /* pdf.js 텍스트 레이어 (선택 → 카드) */
+  .textLayer { position: absolute; inset: 0; overflow: clip; opacity: 1; line-height: 1; text-align: initial; z-index: 2;
+    -webkit-text-size-adjust: none; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; pointer-events: none;
+    --user-unit: 1; --total-scale-factor: calc(var(--scale-factor) * var(--user-unit)); --scale-round-x: 1px; --scale-round-y: 1px;
+    --min-font-size: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv: calc(1 / var(--min-font-size)); }
+  .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+  .textLayer > :not(.markedContent), .textLayer .markedContent span:not(.markedContent) { z-index: 1; --font-height: 0;
+    font-size: calc(var(--text-scale-factor) * var(--font-height)); --scale-x: 1; --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+  .textLayer .markedContent { display: contents; }
+  .textLayer ::selection { background: rgba(79,70,229,.32); }
+  body.select .textLayer { pointer-events: auto; -webkit-user-select: text; user-select: text; }
+  body.select .textLayer span { -webkit-user-select: text; user-select: text; }
+  body.select .surf { touch-action: pan-x pan-y; }
+
+  /* 빈 노트 배경 */
+  .tpl-lined { background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--u) * 34 - 1px), #D6DCEB calc(var(--u) * 34 - 1px), #D6DCEB calc(var(--u) * 34)); background-position: 0 calc(var(--u) * 60); }
+  .tpl-grid { background-image: linear-gradient(#E3E7F1 1px, transparent 1px), linear-gradient(90deg, #E3E7F1 1px, transparent 1px); background-size: calc(var(--u) * 28) calc(var(--u) * 28); }
+  .tpl-dot { background-image: radial-gradient(#C5CBDA calc(var(--u) * 1.6), transparent calc(var(--u) * 1.8)); background-size: calc(var(--u) * 28) calc(var(--u) * 28); }
+
+  /* 스포트라이트 */
+  #spot { position: absolute; z-index: 30; display: none; border-radius: 6px; pointer-events: none;
+    box-shadow: 0 0 0 5000px rgba(10,12,22,var(--dim, .74)); outline: 2px solid rgba(255,214,0,.9); }
+  #spot.show { display: block; }
+  body.spot #spot { pointer-events: auto; cursor: move; }
+  #spot .grip { position: absolute; right: -10px; bottom: -10px; width: 24px; height: 24px; border-radius: 50%; background: #FFD600; border: 3px solid #fff; }
+  #spotCtl { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + var(--safe-bottom)); z-index: 70; display: none;
+    background: rgba(20,22,32,.92); border-radius: 16px; padding: 4px; gap: 2px; align-items: center; }
+  #spotCtl.show { display: flex; }
+  #spotCtl .btn { color: #fff; }
+  #spotCtl .btn:active { background: rgba(255,255,255,.15); }
+  #spotCtl .btn.on { background: #FFD600; color: #111; }
+  #spotCtl input { width: 70px; accent-color: #FFD600; }
+
+  /* 영역 캡처 */
+  #capRect { position: fixed; z-index: 65; border: 2px dashed var(--pri); background: rgba(79,70,229,.12); display: none; pointer-events: none; border-radius: 4px; }
+
+  /* 선택 팝업 */
+  #selPop { position: fixed; z-index: 80; display: none; background: #1B1F2E; border-radius: 12px; padding: 4px; gap: 2px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  #selPop.show { display: flex; }
+  #selPop .btn { color: #fff; height: 34px; }
+
+  #pageInd { position: fixed; right: 12px; bottom: calc(14px + var(--safe-bottom)); z-index: 55; background: rgba(20,22,32,.72); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 10px; pointer-events: none; }
+  #toast { position: fixed; left: 50%; bottom: calc(70px + var(--safe-bottom)); transform: translateX(-50%) translateY(20px); z-index: 90; background: #1B1F2E; color: #fff; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 12px; opacity: 0; transition: all .2s; pointer-events: none; max-width: 86vw; text-align: center; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #loading { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font-weight: 700; color: var(--sub); }
+  #loading .bar { width: 180px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  #loading .bar i { display: block; height: 100%; width: 0; background: var(--pri); transition: width .15s; }
+
+  /* 모달 */
+  #modal { position: fixed; inset: 0; z-index: 95; background: rgba(8,10,20,.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+  #modal.show { display: flex; }
+  #modal .box { background: var(--bar); color: var(--ink); border-radius: 22px; padding: 20px; width: 100%; max-width: 400px; }
+  #modal h3 { margin: 0 0 6px; font-size: 18px; }
+  #modal p { margin: 0 0 14px; color: var(--sub); font-size: 14px; line-height: 1.5; }
+  #modal .big { font-size: 44px; font-weight: 900; text-align: center; color: var(--pri); }
+  #modal input[type=range] { width: 100%; accent-color: var(--pri); }
+  #modal .acts { display: flex; gap: 8px; margin-top: 14px; }
+  #modal .acts button { flex: 1; height: 46px; border: 0; border-radius: 14px; font-weight: 800; font-size: 15px; background: var(--line); color: var(--ink); }
+  #modal .acts button.pri { background: var(--pri); color: #fff; }
+  #modal .quick { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+  #modal .quick button { border: 0; background: var(--pri-soft); color: var(--pri); border-radius: 10px; padding: 6px 10px; font-weight: 800; }
+
+  /* ── 코넬 노트 ── */
+  .cornell { position: relative; margin: 0 auto; background: #fff; color: #161927; box-shadow: 0 4px 16px rgba(20,24,40,.08); border-radius: 4px; }
+  .c-head { display: flex; align-items: flex-end; gap: 10px; padding: 18px 18px 10px; border-bottom: 2px solid #161927; }
+  .c-title { flex: 1; font-size: 22px; font-weight: 900; outline: none; min-height: 28px; -webkit-user-select: text; user-select: text; }
+  .c-title:empty:before { content: '제목'; color: #B5BAC9; }
+  .c-date { font-size: 12px; color: #8A90A2; }
+  .c-labels { display: flex; font-size: 11px; font-weight: 800; color: #8A90A2; border-bottom: 1px solid #E2E5EE; }
+  .c-labels div { padding: 6px 10px; }
+  .crow { display: flex; border-bottom: 1px solid #E2E5EE; position: relative; }
+  .cue { width: 28%; flex: none; border-right: 2px solid #F0B4B4; padding: 10px; font-weight: 800; font-size: 15px; color: #3E63DD; outline: none; word-break: keep-all; -webkit-user-select: text; user-select: text; }
+  .cue:empty:before { content: '키워드·질문'; color: #C5CBDA; font-weight: 600; }
+  body.study .cue { cursor: pointer; -webkit-user-select: none; user-select: none; }
+  body.study .cue:active { background: #EEF0FF; }
+  .cnote { flex: 1; position: relative; display: flex; flex-direction: column; }
+  .ntext { padding: 10px 10px 4px; font-size: 14px; line-height: 1.55; outline: none; -webkit-user-select: text; user-select: text; min-height: 24px; }
+  .ntext:empty:before { content: '타이핑으로 적거나 아래에 손글씨로 적으세요'; color: #C5CBDA; }
+  .inkarea { position: relative; }
+  .rgrip { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); width: 46px; height: 14px; z-index: 8; touch-action: none; display: flex; align-items: center; justify-content: center; cursor: ns-resize; }
+  .rgrip i { width: 30px; height: 4px; border-radius: 2px; background: #D3D8E5; }
+  .blind { position: absolute; inset: 0; z-index: 9; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 6px;
+    background: repeating-linear-gradient(45deg, #2A2F45, #2A2F45 10px, #30364F 10px, #30364F 20px); color: #fff; font-weight: 800; font-size: 14px; cursor: pointer; }
+  .crow.blinded .blind { display: flex; }
+  .blind small { font-weight: 600; opacity: .7; font-size: 12px; }
+  .rtools { position: absolute; left: 4px; bottom: 4px; display: flex; gap: 2px; z-index: 7; }
+  .rtools button { border: 0; background: #F2F4F9; color: #5B6175; border-radius: 8px; height: 26px; min-width: 26px; font-size: 12px; font-weight: 700; padding: 0 6px; }
+  .judge { display: none; position: absolute; right: 6px; top: 6px; z-index: 10; gap: 4px; }
+  .crow.judging .judge { display: flex; }
+  .judge button { border: 0; border-radius: 10px; height: 32px; padding: 0 10px; font-weight: 800; color: #fff; }
+  .score { position: absolute; left: 6px; top: 4px; font-size: 10px; color: #9AA0B2; pointer-events: none; }
+  .c-add { display: block; width: calc(100% - 20px); margin: 10px; height: 40px; border: 1.5px dashed #C5CBDA; border-radius: 12px; background: transparent; color: #5B6175; font-weight: 800; }
+  .c-sum { border-top: 2px solid #161927; padding: 12px 12px 20px; }
+  .c-sum h4 { margin: 0 0 8px; font-size: 13px; color: #8A90A2; display: flex; align-items: center; gap: 8px; }
+  .c-sum h4 button { border: 0; background: #F2F4F9; border-radius: 8px; padding: 4px 8px; font-weight: 700; font-size: 11px; color: #5B6175; }
+  .mm-scroll { overflow-x: auto; padding-bottom: 6px; }
+  .mm-node { display: flex; align-items: center; }
+  .mm-box { flex: none; display: flex; align-items: center; gap: 2px; border: 2px solid var(--c, #3E63DD); background: #fff; border-radius: 12px; padding: 4px 6px; margin: 4px 0; max-width: 240px; }
+  .mm-node.root > .mm-box { background: var(--c, #3E63DD); color: #fff; }
+  .mm-text { outline: none; font-size: 13px; font-weight: 700; min-width: 40px; -webkit-user-select: text; user-select: text; word-break: keep-all; }
+  .mm-text:empty:before { content: '내용'; color: #C5CBDA; }
+  .mm-box button { border: 0; background: transparent; color: inherit; opacity: .55; font-weight: 900; font-size: 14px; width: 22px; height: 22px; padding: 0; }
+  .mm-children { display: flex; flex-direction: column; justify-content: center; position: relative; padding-left: 22px; }
+  .mm-children > .mm-node { position: relative; }
+  .mm-children > .mm-node:before { content: ''; position: absolute; left: -11px; top: 50%; width: 11px; border-top: 2px solid var(--c, #3E63DD); }
+  .mm-children > .mm-node:after { content: ''; position: absolute; left: -11px; top: 0; bottom: 0; border-left: 2px solid var(--c, #3E63DD); }
+  .mm-children > .mm-node:first-child:after { top: 50%; }
+  .mm-children > .mm-node:last-child:after { bottom: 50%; }
+  .mm-children > .mm-node:only-child:after { display: none; }
+  .mm-node > .mm-box:after { content: ''; }
+  .mm-node.has-kids:not(.collapsed) > .mm-box { margin-right: 11px; position: relative; }
+  .mm-node.has-kids:not(.collapsed) > .mm-box:after { position: absolute; right: -13px; top: 50%; width: 11px; border-top: 2px solid var(--c, #3E63DD); }
+  .mm-node.collapsed > .mm-children { display: none; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <div class="row" id="mainbar"></div>
+  <div class="row" id="subbar"></div>
+</div>
+<div id="vp"><div id="content"><div id="spot"><div class="grip"></div></div></div></div>
+<div id="capRect"></div>
+<div id="spotCtl"></div>
+<div id="selPop"></div>
+<div id="pageInd" style="display:none"></div>
+<div id="toast"></div>
+<div id="modal"><div class="box"></div></div>
+<div id="loading"><div id="loadingText">불러오는 중…</div><div class="bar"><i id="loadingBar"></i></div></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ═════════════════ 기본 ═════════════════ */
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var vp = $('#vp'), content = $('#content'), spotEl = $('#spot');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var PEN_COLORS = ['#1A1D29', '#E5484D', '#0090FF', '#30A46C', '#8E4EC6', '#F76B15'];
+  var HL_COLORS = ['#FFE066', '#9BE9A8', '#A5D8FF', '#FFB3C1'];
+  var PEN_W = [2.2, 3.6, 5.5, 8.5];
+  var HL_W = [14, 22, 32];
+  var COMPARE_COLOR = '#E5484D';
+
+  function post(msg) {
+    var s = JSON.stringify(msg);
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(s);
+    else if (window.__engineOut) window.__engineOut(msg);
+  }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function debounce(fn, ms) { var t; return function () { var a = arguments, s = this; clearTimeout(t); t = setTimeout(function () { fn.apply(s, a); }, ms); }; }
+  var toastTimer;
+  function toast(text) { var t = $('#toast'); t.textContent = text; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200); }
+  window.onerror = function (m) { post({ type: 'error', message: String(m) }); };
+
+  /* ═════════════════ 상태 ═════════════════ */
+  var S = {
+    mode: 'pdf', fileId: null, title: '', template: 'blank',
+    tool: 'pen', prevTool: 'pen', color: PEN_COLORS[0], hl: HL_COLORS[0], penW: 1, hlW: 1,
+    penOnly: true, zoom: 1, baseW: 800,
+    surfs: {}, order: [],            // 그릴 수 있는 면 (PDF 페이지, 빈 페이지, 코넬 필기칸)
+    undo: [], redo: [],
+    pdf: null, src: null, srcMap: {}, srcStart: 1,
+    compare: false, opacity: 0.45, colorBeforeCompare: null,
+    study: false, spot: null, dim: 0.74,
+    cornell: null, lastPage: 1, pageCount: 1,
+    chunks: { main: [], src: [] }
+  };
+
+  /* ═════════════════ 아이콘 ═════════════════ */
+  var IC = {
+    back: '<path d="M15 18l-6-6 6-6"/>',
+    hand: '<path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
+    pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    hl: '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
+    eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+    undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>',
+    redo: '<path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>',
+    text: '<path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>',
+    spot: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
+    crop: '<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+    mirror: '<rect x="3" y="3" width="13" height="13" rx="2"/><rect x="8" y="8" width="13" height="13" rx="2"/>',
+    target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    eyeoff: '<path d="M9.9 4.2A10 10 0 0 1 12 4c7 0 10 8 10 8a13 13 0 0 1-1.7 2.7"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/>',
+    card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+    pencilOnly: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/><circle cx="19" cy="19" r="3"/>',
+    up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>',
+    rows: '<path d="M3 12h18M3 6h18M3 18h18"/>', trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+    expand: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>', collapse: '<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>'
+  };
+  function svg(name) { return '<svg viewBox="0 0 24 24">' + (IC[name] || '') + '</svg>'; }
+
+  /* ═════════════════ 잉크 데이터 인코딩 ═════════════════ */
+  // 저장 형식: [[종류(0펜/1형광), 색, 굵기, [x0*10,y0*10,p0, dx,dy,dp, ...]], ...]
+  function encodeStrokes(list) {
+    return JSON.stringify(list.map(function (s) {
+      var d = [], px = 0, py = 0, pp = 0, p = s.p;
+      for (var i = 0; i < p.length; i += 3) {
+        var x = Math.round(p[i] * 10), y = Math.round(p[i + 1] * 10), q = Math.round(p[i + 2] * 100);
+        d.push(x - px, y - py, q - pp); px = x; py = y; pp = q;
+      }
+      return [s.t === 'hl' ? 1 : 0, s.c, Math.round(s.w * 10) / 10, d];
+    }));
+  }
+  function decodeStrokes(str) {
+    if (!str) return [];
+    try {
+      return JSON.parse(str).map(function (a) {
+        var d = a[3], p = [], x = 0, y = 0, q = 0;
+        for (var i = 0; i < d.length; i += 3) { x += d[i]; y += d[i + 1]; q += d[i + 2]; p.push(x / 10, y / 10, q / 100); }
+        return { t: a[0] ? 'hl' : 'pen', c: a[1], w: a[2], p: p };
+      });
+    } catch (e) { return []; }
+  }
+
+  /* ═════════════════ 면(Surface): 그릴 수 있는 영역 ═════════════════ */
+  // surf = { key, el, ratio(h/w), strokes, ink(canvas), pdfIndex?, kind: 'page'|'cell' }
+  function makeSurf(key, el, ratio, kind, inkData) {
+    var s = { key: key, el: el, ratio: ratio, kind: kind, strokes: decodeStrokes(inkData), ink: null, visible: false, rendered: 0 };
+    el.classList.add('surf');
+    el.dataset.key = key;
+    S.surfs[key] = s;
+    S.order.push(key);
+    return s;
+  }
+  function surfW(s) { return s.el.clientWidth || 1; }
+  function unit(s) { return surfW(s) / 1000; }
+
+  function sizeCanvas(c, w, h) {
+    var dpr = DPR;
+    if (w * h * dpr * dpr > 9e6) dpr = Math.sqrt(9e6 / (w * h));
+    var W = Math.max(1, Math.round(w * dpr)), H = Math.max(1, Math.round(h * dpr));
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    return W / w;
+  }
+
+  function strokePath(ctx, p, k) {
+    ctx.beginPath();
+    ctx.moveTo(p[0] * k, p[1] * k);
+    if (p.length === 3) { ctx.lineTo(p[0] * k + 0.01, p[1] * k + 0.01); return; }
+    for (var i = 3; i < p.length - 3; i += 3) {
+      var mx = (p[i] + p[i + 3]) / 2, my = (p[i + 1] + p[i + 4]) / 2;
+      ctx.quadraticCurveTo(p[i] * k, p[i + 1] * k, mx * k, my * k);
+    }
+    ctx.lineTo(p[p.length - 3] * k, p[p.length - 2] * k);
+  }
+
+  function drawStroke(ctx, s, k) {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = s.c;
+    var p = s.p;
+    if (s.t === 'hl') {
+      ctx.globalAlpha = 0.38; ctx.globalCompositeOperation = 'multiply';
+      ctx.lineCap = 'butt'; ctx.lineWidth = s.w * k;
+      strokePath(ctx, p, k); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      return;
+    }
+    // 펜: 필압에 따라 굵기가 변하는 구간 단위 렌더링
+    if (p.length <= 6) { ctx.lineWidth = s.w * k * (0.55 + 0.9 * (p[2] || 0.5)); strokePath(ctx, p, k); ctx.stroke(); return; }
+    var lx = p[0], ly = p[1];
+    for (var i = 3; i < p.length; i += 3) {
+      var mx = i + 3 < p.length ? (p[i] + p[i + 3]) / 2 : p[i];
+      var my = i + 3 < p.length ? (p[i + 1] + p[i + 4]) / 2 : p[i + 1];
+      ctx.lineWidth = s.w * k * (0.55 + 0.9 * p[i + 2]);
+      ctx.beginPath();
+      ctx.moveTo(lx * k, ly * k);
+      ctx.quadraticCurveTo(p[i] * k, p[i + 1] * k, mx * k, my * k);
+      ctx.stroke();
+      lx = mx; ly = my;
+    }
+  }
+
+  function redrawInk(s) {
+    if (!s.ink) return;
+    var w = surfW(s), h = w * s.ratio;
+    var k = sizeCanvas(s.ink, w, h) * w / 1000;
+    var ctx = s.ink.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, s.ink.width, s.ink.height);
+    var i;
+    for (i = 0; i < s.strokes.length; i++) if (s.strokes[i].t === 'hl') drawStroke(ctx, s.strokes[i], k);
+    for (i = 0; i < s.strokes.length; i++) if (s.strokes[i].t !== 'hl') drawStroke(ctx, s.strokes[i], k);
+  }
+
+  function ensureInk(s) {
+    if (!s.ink) { s.ink = el('canvas', 'ink'); s.el.appendChild(s.ink); }
+    redrawInk(s);
+  }
+  function releaseSurf(s) {
+    if (s.ink) { s.ink.width = s.ink.height = 0; s.ink.remove(); s.ink = null; }
+    if (s.pdfCanvas) { s.pdfCanvas.width = s.pdfCanvas.height = 0; }
+    if (s.overlay) { s.overlay.width = s.overlay.height = 0; s.overlayFor = null; }
+    if (s.textLayer) { s.textLayer.innerHTML = ''; s.textReady = 0; }
+    s.rendered = 0;
+  }
+
+  /* 저장 (면마다 0.7초 디바운스) */
+  var dirty = {};
+  var flushInk = debounce(function () {
+    Object.keys(dirty).forEach(function (k) { var s = S.surfs[k]; if (s) post({ type: 'saveInk', key: k, data: encodeStrokes(s.strokes) }); });
+    dirty = {};
+  }, 700);
+  function markDirty(k) { dirty[k] = 1; flushInk(); }
+
+  /* ═════════════════ 레이아웃 / 렌더링 ═════════════════ */
+  function measureBars() {
+    var bar = $('#bar');
+    document.documentElement.style.setProperty('--bar-h', bar.getBoundingClientRect().height + 'px');
+  }
+  function layout() {
+    var vw = vp.clientWidth;
+    S.baseW = Math.min(vw - 20, S.mode === 'cornell' ? 900 : 980);
+    var pw = Math.round(S.baseW * S.zoom);
+    content.style.width = Math.max(vw, pw + 20) + 'px';
+    if (S.mode === 'cornell') {
+      var c = $('.cornell'); if (c) c.style.width = pw + 'px';
+      S.order.forEach(function (k) { var s = S.surfs[k]; s.el.style.height = Math.round(surfW(s) * s.ratio) + 'px'; });
+    } else {
+      S.order.forEach(function (k) {
+        var s = S.surfs[k];
+        s.el.style.width = pw + 'px';
+        s.el.style.height = Math.round(pw * s.ratio) + 'px';
+        s.el.style.setProperty('--u', (pw / 1000) + 'px');
+      });
+    }
+  }
+  var rerenderSoon = debounce(function () { S.order.forEach(function (k) { var s = S.surfs[k]; if (s.visible) renderSurf(s, true); }); }, 260);
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      var s = S.surfs[e.target.dataset.key];
+      if (!s) return;
+      s.visible = e.isIntersecting;
+      if (s.visible) renderSurf(s); else if (s.kind === 'page') releaseSurf(s);
+    });
+    updatePageInd();
+  }, { root: vp, rootMargin: '900px 0px 900px 0px' });
+
+  function renderSurf(s, force) {
+    var w = surfW(s);
+    if (!force && s.rendered === w) return;
+    s.rendered = w;
+    ensureInk(s);
+    if (s.pdfIndex && S.pdf) renderPdfPage(s);
+    if (S.mode === 'recall' && S.compare) renderOverlay(s);
+  }
+
+  function renderPdfPage(s) {
+    if (!s.pdfCanvas) { s.pdfCanvas = el('canvas', 'pdf'); s.el.insertBefore(s.pdfCanvas, s.el.firstChild); }
+    if (!s.textLayer) { s.textLayer = el('div', 'textLayer'); s.el.appendChild(s.textLayer); }
+    var token = s.token = (s.token || 0) + 1;
+    S.pdf.getPage(s.pdfIndex).then(function (page) {
+      if (token !== s.token) return;
+      var w = surfW(s), base = page.getViewport({ scale: 1 });
+      var cssScale = w / base.width;
+      var k = sizeCanvas(s.pdfCanvas, w, w * base.height / base.width);
+      var vpRender = page.getViewport({ scale: cssScale * k });
+      if (s.task) { try { s.task.cancel(); } catch (e) {} }
+      s.task = page.render({ canvasContext: s.pdfCanvas.getContext('2d'), viewport: vpRender, canvas: s.pdfCanvas });
+      s.task.promise.then(function () { s.task = null; }, function () {});
+      if (s.textReady !== w) {
+        s.textReady = w;
+        s.textLayer.innerHTML = '';
+        var cssVp = page.getViewport({ scale: cssScale });
+        s.textLayer.style.setProperty('--scale-factor', cssScale);
+        try {
+          var tl = new window.pdfjsLib.TextLayer({ textContentSource: page.streamTextContent(), container: s.textLayer, viewport: cssVp });
+          tl.render().catch(function () {});
+        } catch (e) {}
+      }
+    });
+  }
+
+  /* ═════════════════ 페이지 구성 ═════════════════ */
+  function addPageEl(key, ratio, opts, inkData) {
+    var pg = el('div', 'page');
+    if (opts.template && opts.template !== 'blank') { var bg = el('div', 'bgtpl tpl-' + opts.template); pg.appendChild(bg); }
+    var s = makeSurf(key, pg, ratio, 'page', inkData);
+    s.pdfIndex = opts.pdfIndex || null;
+    s.num = opts.num;
+    pg.appendChild(el('div', 'pnum', String(opts.num)));
+    content.insertBefore(pg, spotEl);
+    io.observe(pg);
+    return s;
+  }
+
+  function buildPdfPages(pdf, ink) {
+    var n = pdf.numPages, chain = Promise.resolve(), ratios = [];
+    // 첫 페이지 비율로 먼저 자리를 잡고, 각 페이지 비율은 순차로 갱신
+    return pdf.getPage(1).then(function (p1) {
+      var v = p1.getViewport({ scale: 1 }), r = v.height / v.width;
+      for (var i = 1; i <= n; i++) addPageEl('p' + i, r, { pdfIndex: i, num: i }, ink['p' + i]);
+      layout();
+      if (initData && initData.pageCount !== n) post({ type: 'saveDoc', patch: { pageCount: n } });
+      for (var j = 2; j <= Math.min(n, 400); j++) (function (j) {
+        chain = chain.then(function () { return pdf.getPage(j).then(function (p) { var vv = p.getViewport({ scale: 1 }); var rr = vv.height / vv.width; var s = S.surfs['p' + j]; if (Math.abs(rr - s.ratio) > 0.01) { s.ratio = rr; s.rendered = 0; } }); });
+      })(j);
+      return chain.then(function () { layout(); });
+    });
+  }
+
+  function buildBlankPages(count, ink) {
+    for (var i = 1; i <= count; i++) addPageEl('p' + i, 1.414, { template: S.template, num: i }, ink['p' + i]);
+    S.pageCount = count;
+    layout();
+  }
+
+  function addBlankPage() {
+    var n = S.pageCount + 1;
+    var s = addPageEl('p' + n, 1.414, { template: S.template, num: n }, '');
+    S.pageCount = n;
+    layout(); renderSurf(s, true);
+    post({ type: 'saveDoc', patch: { pageCount: n } });
+    setTimeout(function () { vp.scrollTo({ top: s.el.offsetTop - 10, behavior: 'smooth' }); }, 50);
+  }
+
+  function currentPage() {
+    var mid = vp.scrollTop + vp.clientHeight * 0.4, best = null;
+    S.order.forEach(function (k) { var s = S.surfs[k]; if (s.kind === 'page' && s.el.offsetTop <= mid) best = s; });
+    return best || S.surfs[S.order[0]];
+  }
+  var reportState = debounce(function () { var p = currentPage(); if (p && p.num) post({ type: 'state', page: p.num }); }, 1200);
+  function updatePageInd() {
+    if (S.mode === 'cornell') return;
+    var p = currentPage(), ind = $('#pageInd');
+    var total = S.order.length;
+    if (!p) return;
+    ind.style.display = 'block';
+    ind.textContent = p.num + ' / ' + total + (S.mode === 'recall' && S.compare && S.src ? '  ·  원본 ' + srcPageFor(p) + 'p' : '');
+    reportState();
+  }
+  vp.addEventListener('scroll', function () { updatePageInd(); hideSelPop(); }, { passive: true });
+
+  /* ═════════════════ 백지 복습: 원본 대조 레이어 ═════════════════ */
+  function srcPageFor(s) {
+    var n = S.srcMap[s.key] || (S.srcStart + (s.num - 1));
+    return S.src ? clamp(n, 1, S.src.numPages) : n;
+  }
+  function renderOverlay(s) {
+    if (!S.src) return;
+    if (!s.overlay) { s.overlay = el('canvas', 'overlay'); s.el.appendChild(s.overlay); }
+    s.overlay.style.display = '';
+    s.overlay.style.opacity = S.opacity;
+    var n = srcPageFor(s), w = surfW(s), key = n + '@' + w;
+    if (s.overlayFor === key) return;
+    s.overlayFor = key;
+    S.src.getPage(n).then(function (page) {
+      var base = page.getViewport({ scale: 1 });
+      var cssScale = w / base.width;
+      var h = w * s.ratio;
+      var k = sizeCanvas(s.overlay, w, h);
+      var ctx = s.overlay.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, s.overlay.width, s.overlay.height);
+      page.render({ canvasContext: ctx, viewport: page.getViewport({ scale: cssScale * k }), canvas: s.overlay });
+    });
+  }
+  function hideOverlays() { S.order.forEach(function (k) { var s = S.surfs[k]; if (s.overlay) s.overlay.style.display = 'none'; }); }
+  function setCompare(on) {
+    if (on && !S.src) { S.pendingCompare = true; post({ type: 'needSource' }); toast('대조할 원본 PDF를 골라주세요'); return; }
+    S.compare = on;
+    if (on) {
+      S.colorBeforeCompare = S.color; S.color = COMPARE_COLOR;
+      if (S.tool !== 'pen') setTool('pen');
+      S.order.forEach(function (k) { var s = S.surfs[k]; if (s.visible) renderOverlay(s); });
+      toast('원본이 겹쳐졌어요 · 빠뜨린 부분을 빨간색으로 보완하세요');
+    } else {
+      if (S.colorBeforeCompare) S.color = S.colorBeforeCompare;
+      hideOverlays();
+    }
+    buildBars(); updatePageInd();
+  }
+  function shiftSrc(d) {
+    var p = currentPage(); if (!p || !S.src) return;
+    S.srcMap[p.key] = clamp(srcPageFor(p) + d, 1, S.src.numPages);
+    p.overlayFor = null; renderOverlay(p); updatePageInd();
+    post({ type: 'saveDoc', patch: { content: { srcMap: S.srcMap } } });
+  }
+  function openScore() {
+    modal('<h3>얼마나 기억해냈나요?</h3><p>원본과 비교해서 스스로 채점해 보세요. 점수에 따라 다음 복습일이 정해져요.</p>' +
+      '<div class="big" id="scv">70%</div><input id="scr" type="range" min="0" max="100" step="5" value="70" />' +
+      '<div class="quick"><button data-v="30">30</button><button data-v="50">50</button><button data-v="70">70</button><button data-v="90">90</button><button data-v="100">100</button></div>' +
+      '<div class="acts"><button id="mcancel">취소</button><button class="pri" id="mok">기록하기</button></div>');
+    var r = $('#scr'), v = $('#scv');
+    r.oninput = function () { v.textContent = r.value + '%'; };
+    Array.prototype.forEach.call(document.querySelectorAll('#modal .quick button'), function (b) { b.onclick = function () { r.value = b.dataset.v; r.oninput(); }; });
+    $('#mcancel').onclick = closeModal;
+    $('#mok').onclick = function () { post({ type: 'recallScore', score: Number(r.value) }); closeModal(); };
+  }
+
+  /* ═════════════════ 모달 ═════════════════ */
+  function modal(html) { $('#modal .box').innerHTML = html; $('#modal').classList.add('show'); }
+  function closeModal() { $('#modal').classList.remove('show'); }
+  $('#modal').addEventListener('pointerdown', function (e) { if (e.target.id === 'modal') closeModal(); });
+
+  /* ═════════════════ 도구 막대 ═════════════════ */
+  function btn(icon, label, on, onClick, cls) {
+    var b = el('button', 'btn' + (on ? ' on' : '') + (cls ? ' ' + cls : ''), (icon ? svg(icon) : '') + (label ? '<span class="lbl">' + label + '</span>' : ''));
+    b.addEventListener('click', function (e) { e.preventDefault(); onClick(); });
+    return b;
+  }
+  function sep() { return el('div', 'sep'); }
+
+  function buildBars() {
+    var m = $('#mainbar'); m.innerHTML = '';
+    m.appendChild(btn('back', '', false, function () { flushNow(); post({ type: 'close' }); }));
+    var t = el('div', ''); t.id = 'title'; t.textContent = S.title; m.appendChild(t);
+    m.appendChild(sep());
+    m.appendChild(btn('hand', '', S.tool === 'hand', function () { setTool('hand'); }));
+    m.appendChild(btn('pen', '', S.tool === 'pen', function () { setTool('pen'); }));
+    m.appendChild(btn('hl', '', S.tool === 'hl', function () { setTool('hl'); }));
+    m.appendChild(btn('eraser', '', S.tool === 'eraser', function () { setTool('eraser'); }));
+    if (S.tool === 'pen' || S.tool === 'hl') {
+      m.appendChild(sep());
+      var cols = S.tool === 'hl' ? HL_COLORS : PEN_COLORS, cur = S.tool === 'hl' ? S.hl : S.color;
+      cols.forEach(function (c) {
+        var sw = el('div', 'sw' + (c === cur ? ' on' : '')); sw.style.background = c;
+        sw.addEventListener('click', function () { if (S.tool === 'hl') S.hl = c; else S.color = c; buildBars(); });
+        m.appendChild(sw);
+      });
+      var ws = S.tool === 'hl' ? HL_W : PEN_W, wi = S.tool === 'hl' ? S.hlW : S.penW;
+      ws.forEach(function (w, i) {
+        var d = el('div', 'wd' + (i === wi ? ' on' : '')), dot = el('i');
+        var sz = S.tool === 'hl' ? 6 + i * 4 : 3 + i * 3; dot.style.width = dot.style.height = sz + 'px';
+        if (S.tool === 'hl') { dot.style.width = '18px'; dot.style.borderRadius = '2px'; dot.style.background = S.hl; }
+        d.appendChild(dot);
+        d.addEventListener('click', function () { if (S.tool === 'hl') S.hlW = i; else S.penW = i; buildBars(); });
+        m.appendChild(d);
+      });
+    }
+    m.appendChild(sep());
+    var u = btn('undo', '', false, undo); if (!S.undo.length) u.disabled = true; m.appendChild(u);
+    var r = btn('redo', '', false, redo); if (!S.redo.length) r.disabled = true; m.appendChild(r);
+    m.appendChild(sep());
+    if (S.mode === 'pdf') m.appendChild(btn('text', '선택', S.tool === 'select', function () { setTool(S.tool === 'select' ? S.prevTool : 'select'); }));
+    m.appendChild(btn('spot', '집중', S.tool === 'spot' || !!S.spot, function () { setTool(S.tool === 'spot' ? S.prevTool : 'spot'); if (!S.spot) toast('집중해서 볼 영역을 드래그하세요'); }));
+    m.appendChild(btn('crop', '카드', S.tool === 'capture', function () { setTool(S.tool === 'capture' ? S.prevTool : 'capture'); toast('카드로 만들 영역을 드래그하세요'); }));
+    m.appendChild(sep());
+    m.appendChild(btn('minus', '', false, function () { setZoom(S.zoom / 1.2); }));
+    var zl = el('div', 'pill'); zl.textContent = Math.round(S.zoom * 100) + '%'; m.appendChild(zl);
+    m.appendChild(btn('plus', '', false, function () { setZoom(S.zoom * 1.2); }));
+    m.appendChild(btn('pencilOnly', S.penOnly ? '펜만' : '손가락도', S.penOnly, function () {
+      S.penOnly = !S.penOnly; post({ type: 'prefs', penOnly: S.penOnly });
+      toast(S.penOnly ? '펜으로만 필기 · 손가락은 스크롤' : '손가락으로도 필기 · 두 손가락으로 스크롤');
+      buildBars();
+    }));
+
+    // 모드별 보조 막대
+    var sb = $('#subbar'); sb.innerHTML = '';
+    if (S.mode === 'recall') {
+      sb.appendChild(btn('mirror', '원본 대조', S.compare, function () { setCompare(!S.compare); }, 'red'));
+      if (S.compare) {
+        var rg = el('input', 'range'); rg.type = 'range'; rg.min = 10; rg.max = 90; rg.value = Math.round(S.opacity * 100);
+        rg.addEventListener('input', function () { S.opacity = rg.value / 100; S.order.forEach(function (k) { var s = S.surfs[k]; if (s.overlay) s.overlay.style.opacity = S.opacity; }); });
+        sb.appendChild(el('div', 'pill', '투명도')); sb.appendChild(rg);
+        sb.appendChild(btn('left', '', false, function () { shiftSrc(-1); }));
+        sb.appendChild(el('div', 'pill', '원본 쪽'));
+        sb.appendChild(btn('right', '', false, function () { shiftSrc(1); }));
+      }
+      sb.appendChild(sep());
+      sb.appendChild(btn('target', '채점', false, openScore));
+      sb.appendChild(btn('plus', '페이지', false, addBlankPage));
+      sb.appendChild(btn('card', '원본 바꾸기', false, function () { post({ type: 'needSource' }); }));
+    } else if (S.mode === 'blank') {
+      sb.appendChild(btn('plus', '페이지 추가', false, addBlankPage));
+      sb.appendChild(btn('trash', '이 페이지 지우기', false, clearCurrent));
+    } else if (S.mode === 'cornell') {
+      sb.appendChild(btn(S.study ? 'eyeoff' : 'eye', '암기 모드', S.study, function () { setStudy(!S.study); }));
+      if (S.study) {
+        sb.appendChild(btn('eyeoff', '전체 가리기', false, function () { blindAll(true); }));
+        sb.appendChild(btn('eye', '전체 보기', false, function () { blindAll(false); }));
+      }
+      sb.appendChild(sep());
+      sb.appendChild(btn('plus', '행 추가', false, function () { addRow(); }));
+      sb.appendChild(btn('card', '모든 행 → 카드', false, exportAllRows));
+    }
+    sb.classList.toggle('show', sb.children.length > 0);
+    requestAnimationFrame(measureBars);
+  }
+
+  function setTool(t) {
+    if (t !== 'select' && t !== 'spot' && t !== 'capture' && t !== 'hand') S.prevTool = t;
+    else if (S.tool !== 'select' && S.tool !== 'spot' && S.tool !== 'capture' && S.tool !== 'hand') S.prevTool = S.tool;
+    S.tool = t;
+    document.body.classList.toggle('select', t === 'select');
+    document.body.classList.toggle('spot', t === 'spot');
+    if (t !== 'select') { try { window.getSelection().removeAllRanges(); } catch (e) {} hideSelPop(); }
+    buildBars(); updateSpotCtl();
+  }
+
+  function setZoom(z, keepPoint) {
+    var old = S.zoom;
+    S.zoom = clamp(z, 0.5, 4);
+    var r = S.zoom / old;
+    var cx = keepPoint ? keepPoint.x : vp.clientWidth / 2, cy = keepPoint ? keepPoint.y : vp.clientHeight / 2;
+    var px = vp.scrollLeft + cx, py = vp.scrollTop + cy;
+    if (S.spot) { S.spot.x *= r; S.spot.y *= r; S.spot.w *= r; S.spot.h *= r; placeSpot(); }
+    layout();
+    vp.scrollLeft = px * r - cx; vp.scrollTop = py * r - cy;
+    rerenderSoon();
+    if (!keepPoint) buildBars();
+  }
+
+  /* ═════════════════ 실행 취소 ═════════════════ */
+  function pushUndo(a) { S.undo.push(a); if (S.undo.length > 200) S.undo.shift(); S.redo = []; buildBarsSoon(); }
+  var buildBarsSoon = debounce(buildBars, 60);
+  function applyAction(a, reverse) {
+    var s = S.surfs[a.key]; if (!s) return;
+    if (a.type === 'add') {
+      if (reverse) { var i = s.strokes.indexOf(a.stroke); if (i >= 0) s.strokes.splice(i, 1); } else s.strokes.push(a.stroke);
+    } else if (a.type === 'erase' || a.type === 'clear') {
+      if (reverse) { a.items.slice().sort(function (x, y) { return x.i - y.i; }).forEach(function (it) { s.strokes.splice(Math.min(it.i, s.strokes.length), 0, it.s); }); }
+      else { a.items.forEach(function (it) { var j = s.strokes.indexOf(it.s); if (j >= 0) s.strokes.splice(j, 1); }); }
+    }
+    redrawInk(s); markDirty(a.key);
+  }
+  function undo() { var a = S.undo.pop(); if (!a) return; applyAction(a, true); S.redo.push(a); buildBars(); }
+  function redo() { var a = S.redo.pop(); if (!a) return; applyAction(a, false); S.undo.push(a); buildBars(); }
+  function clearCurrent() {
+    var p = currentPage(); if (!p || !p.strokes.length) return;
+    var items = p.strokes.map(function (s, i) { return { s: s, i: i }; });
+    p.strokes = []; redrawInk(p); markDirty(p.key);
+    pushUndo({ type: 'clear', key: p.key, items: items });
+    toast('페이지를 지웠어요 (실행 취소 가능)');
+  }
+  document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } });
+
+  /* ═════════════════ 포인터 입력 ═════════════════ */
+  var ptrs = {};          // 화면에 닿은 손가락/펜
+  var stroke = null;      // 그리는 중인 획 {surf, s, live, ctxK, rect}
+  var erasing = null;     // {surf별 지운 목록}
+  var pan = null, pinch = null, mom = null;
+  var rectDrag = null;    // 스포트라이트/캡처 사각형
+  var spotDrag = null;
+
+  function surfAt(target) { var e = target && target.closest ? target.closest('.surf') : null; return e ? S.surfs[e.dataset.key] : null; }
+  function toUnits(s, e) { var r = s.el.getBoundingClientRect(); var k = 1000 / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k }; }
+  function pressure(e) { return e.pointerType === 'pen' ? clamp(e.pressure || 0.5, 0.05, 1) : 0.5; }
+  function isDrawTool() { return S.tool === 'pen' || S.tool === 'hl' || S.tool === 'eraser'; }
+  function touchCount() { var n = 0; for (var k in ptrs) if (ptrs[k].type === 'touch') n++; return n; }
+  function isUI(t) { return t.closest && t.closest('button, input, [contenteditable="true"], .rtools, .judge, .mm-box, #selPop, #spotCtl'); }
+
+  vp.addEventListener('pointerdown', function (e) {
+    if (isUI(e.target)) return;
+    if (S.tool === 'select' && e.pointerType !== 'pen') return; // 손가락: 기본 스크롤/텍스트 선택
+    if (S.tool === 'select') return;
+    var s = surfAt(e.target);
+    ptrs[e.pointerId] = { x: e.clientX, y: e.clientY, type: e.pointerType };
+    stopMomentum();
+
+    // 두 손가락 → 확대/이동 (진행 중인 손가락 획은 취소)
+    if (e.pointerType === 'touch' && touchCount() === 2) {
+      if (stroke && stroke.byTouch) cancelStroke();
+      if (rectDrag) { rectDrag = null; $('#capRect').style.display = 'none'; }
+      startPinch(); e.preventDefault(); return;
+    }
+    if (e.pointerType === 'touch' && touchCount() > 2) return;
+    // 펜이 그리는 중이면 손바닥(터치) 무시
+    if (stroke && e.pointerType === 'touch') return;
+
+    // 스포트라이트 이동/크기조절
+    if (S.tool === 'spot' && S.spot && e.target.closest('#spot')) {
+      spotDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, o: Object.assign({}, S.spot), resize: !!e.target.closest('.grip') };
+      e.preventDefault(); return;
+    }
+    if (S.tool === 'spot' || S.tool === 'capture') {
+      if (!s && S.tool === 'capture') return;
+      rectDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY };
+      e.preventDefault(); return;
+    }
+    if (!s) return; // 면 밖: 기본 스크롤
+    if (isDrawTool() && (e.pointerType !== 'touch' || !S.penOnly)) {
+      startStroke(s, e); e.preventDefault(); return;
+    }
+    // 손가락 한 개: 수동 스크롤 (면은 touch-action:none 이라 직접 처리)
+    if (e.pointerType === 'touch' || S.tool === 'hand') { pan = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), vx: 0, vy: 0 }; e.preventDefault(); }
+  }, { passive: false });
+
+  window.addEventListener('pointermove', function (e) {
+    var p = ptrs[e.pointerId]; if (!p) return;
+    p.x = e.clientX; p.y = e.clientY;
+    if (pinch) { movePinch(); return; }
+    if (stroke && stroke.id === e.pointerId) { moveStroke(e); return; }
+    if (spotDrag && spotDrag.id === e.pointerId) {
+      var z = spotDrag, dx = e.clientX - z.sx, dy = e.clientY - z.sy;
+      if (z.resize) { S.spot.w = Math.max(60, z.o.w + dx); S.spot.h = Math.max(24, z.o.h + dy); }
+      else { S.spot.x = z.o.x + dx; S.spot.y = z.o.y + dy; }
+      placeSpot(); return;
+    }
+    if (rectDrag && rectDrag.id === e.pointerId) { rectDrag.x = e.clientX; rectDrag.y = e.clientY; drawRectDrag(); return; }
+    if (pan && pan.id === e.pointerId) {
+      var now = performance.now(), ddx = e.clientX - pan.x, ddy = e.clientY - pan.y, dt = Math.max(1, now - pan.t);
+      vp.scrollLeft -= ddx; vp.scrollTop -= ddy;
+      pan.vx = 0.8 * pan.vx + 0.2 * (ddx / dt * 16); pan.vy = 0.8 * pan.vy + 0.2 * (ddy / dt * 16);
+      pan.x = e.clientX; pan.y = e.clientY; pan.t = now;
+    }
+  }, { passive: false });
+
+  function endPointer(e) {
+    var p = ptrs[e.pointerId]; if (!p) return;
+    delete ptrs[e.pointerId];
+    if (pinch) { if (touchCount() < 2) endPinch(); return; }
+    if (stroke && stroke.id === e.pointerId) { if (e.type === 'pointercancel' && stroke.byTouch) cancelStroke(); else endStroke(); return; }
+    if (spotDrag && spotDrag.id === e.pointerId) { spotDrag = null; return; }
+    if (rectDrag && rectDrag.id === e.pointerId) { finishRectDrag(); return; }
+    if (pan && pan.id === e.pointerId) { startMomentum(pan.vx, pan.vy); pan = null; }
+  }
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+
+  function startMomentum(vx, vy) {
+    if (Math.abs(vx) < 1 && Math.abs(vy) < 1) return;
+    mom = { vx: vx, vy: vy };
+    (function step() {
+      if (!mom) return;
+      vp.scrollLeft -= mom.vx; vp.scrollTop -= mom.vy;
+      mom.vx *= 0.94; mom.vy *= 0.94;
+      if (Math.abs(mom.vx) < 0.4 && Math.abs(mom.vy) < 0.4) { mom = null; return; }
+      requestAnimationFrame(step);
+    })();
+  }
+  function stopMomentum() { mom = null; }
+
+  function touchPts() { var a = []; for (var k in ptrs) if (ptrs[k].type === 'touch') a.push(ptrs[k]); return a; }
+  function startPinch() {
+    pan = null;
+    var a = touchPts(); if (a.length < 2) return;
+    var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+    var vr = vp.getBoundingClientRect();
+    pinch = { d0: d, z0: S.zoom, cx: (a[0].x + a[1].x) / 2 - vr.left, cy: (a[0].y + a[1].y) / 2 - vr.top };
+  }
+  function movePinch() {
+    var a = touchPts(); if (a.length < 2) return;
+    var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+    var vr = vp.getBoundingClientRect();
+    var cx = (a[0].x + a[1].x) / 2 - vr.left, cy = (a[0].y + a[1].y) / 2 - vr.top;
+    // 두 손가락 이동 = 스크롤
+    vp.scrollLeft -= cx - pinch.cx; vp.scrollTop -= cy - pinch.cy;
+    pinch.cx = cx; pinch.cy = cy;
+    var z = clamp(pinch.z0 * d / pinch.d0, 0.5, 4);
+    if (Math.abs(z - S.zoom) / S.zoom > 0.015) setZoom(z, { x: cx, y: cy });
+  }
+  function endPinch() { pinch = null; buildBars(); }
+
+  /* 획 그리기 */
+  function startStroke(s, e) {
+    if (S.tool === 'eraser') { stroke = { id: e.pointerId, surf: s, erase: true, items: [], byTouch: e.pointerType === 'touch' }; eraseAt(s, toUnits(s, e)); return; }
+    var hl = S.tool === 'hl';
+    var st = { t: hl ? 'hl' : 'pen', c: hl ? S.hl : S.color, w: hl ? HL_W[S.hlW] : PEN_W[S.penW], p: [] };
+    var u = toUnits(s, e);
+    st.p.push(u.x, u.y, pressure(e));
+    var live = $('#live') || el('canvas'); live.id = 'live';
+    s.el.appendChild(live);
+    var w = surfW(s);
+    var k = sizeCanvas(live, w, w * s.ratio) * w / 1000;
+    stroke = { id: e.pointerId, surf: s, s: st, live: live, k: k, byTouch: e.pointerType === 'touch', raf: 0 };
+    drawLive();
+  }
+  function moveStroke(e) {
+    var s = stroke.surf;
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!evs.length) evs = [e];
+    for (var i = 0; i < evs.length; i++) {
+      var u = toUnits(s, evs[i]);
+      if (stroke.erase) { eraseAt(s, u); continue; }
+      var p = stroke.s.p, n = p.length;
+      if (Math.hypot(u.x - p[n - 3], u.y - p[n - 2]) < 0.6) continue;
+      p.push(u.x, u.y, pressure(evs[i]));
+    }
+    if (!stroke.erase && !stroke.raf) stroke.raf = requestAnimationFrame(drawLive);
+  }
+  function drawLive() {
+    if (!stroke || stroke.erase) return;
+    stroke.raf = 0;
+    var c = stroke.live, ctx = c.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, c.width, c.height);
+    drawStroke(ctx, stroke.s, stroke.k);
+  }
+  function endStroke() {
+    var st = stroke; stroke = null;
+    if (st.erase) {
+      if (st.items.length) pushUndo({ type: 'erase', key: st.surf.key, items: st.items });
+      return;
+    }
+    if (st.raf) cancelAnimationFrame(st.raf);
+    st.live.getContext('2d').clearRect(0, 0, st.live.width, st.live.height);
+    st.live.remove();
+    var s = st.surf;
+    s.strokes.push(st.s);
+    redrawInk(s); markDirty(s.key);
+    pushUndo({ type: 'add', key: s.key, stroke: st.s });
+  }
+  function cancelStroke() {
+    var st = stroke; stroke = null; if (!st) return;
+    if (st.live) { st.live.getContext('2d').clearRect(0, 0, st.live.width, st.live.height); st.live.remove(); }
+    if (st.erase && st.items.length) { applyAction({ type: 'erase', key: st.surf.key, items: st.items }, true); }
+  }
+
+  /* 지우개: 닿은 획을 통째로 지움 */
+  function bbox(s) {
+    if (s._bb) return s._bb;
+    var p = s.p, a = [Infinity, Infinity, -Infinity, -Infinity];
+    for (var i = 0; i < p.length; i += 3) { a[0] = Math.min(a[0], p[i]); a[1] = Math.min(a[1], p[i + 1]); a[2] = Math.max(a[2], p[i]); a[3] = Math.max(a[3], p[i + 1]); }
+    return (s._bb = a);
+  }
+  function eraseAt(s, u) {
+    var R = 12 / Math.max(0.5, S.zoom * (S.baseW / 1000)) , hit = false;
+    for (var i = s.strokes.length - 1; i >= 0; i--) {
+      var st = s.strokes[i], b = bbox(st), r = R + st.w / 2;
+      if (u.x < b[0] - r || u.x > b[2] + r || u.y < b[1] - r || u.y > b[3] + r) continue;
+      var p = st.p;
+      for (var j = 0; j < p.length; j += 3) {
+        if (Math.hypot(p[j] - u.x, p[j + 1] - u.y) <= r) { stroke.items.push({ s: st, i: i }); s.strokes.splice(i, 1); hit = true; break; }
+      }
+    }
+    if (hit) { redrawInk(s); markDirty(s.key); }
+  }
+
+  /* ═════════════════ 스포트라이트 & 영역 사각형 ═════════════════ */
+  function drawRectDrag() {
+    var r = rectDrag, c = $('#capRect');
+    if (S.tool === 'spot') {
+      var cr = content.getBoundingClientRect();
+      S.spot = { x: Math.min(r.sx, r.x) - cr.left, y: Math.min(r.sy, r.y) - cr.top, w: Math.abs(r.x - r.sx), h: Math.abs(r.y - r.sy) };
+      placeSpot(); return;
+    }
+    c.style.display = 'block';
+    c.style.left = Math.min(r.sx, r.x) + 'px'; c.style.top = Math.min(r.sy, r.y) + 'px';
+    c.style.width = Math.abs(r.x - r.sx) + 'px'; c.style.height = Math.abs(r.y - r.sy) + 'px';
+  }
+  function finishRectDrag() {
+    var r = rectDrag; rectDrag = null;
+    $('#capRect').style.display = 'none';
+    var w = Math.abs(r.x - r.sx), h = Math.abs(r.y - r.sy);
+    if (S.tool === 'spot') {
+      if (w < 30 || h < 14) {
+        // 탭만 했으면 그 위치에 문단 폭의 띠 생성
+        var cr = content.getBoundingClientRect(), s = surfAt(document.elementFromPoint(r.sx, r.sy));
+        if (s) { var sr = s.el.getBoundingClientRect(); S.spot = { x: sr.left - cr.left, y: r.sy - cr.top - 30, w: sr.width, h: 60 }; }
+      }
+      placeSpot(); updateSpotCtl(); return;
+    }
+    if (w < 20 || h < 20) return;
+    captureRect({ left: Math.min(r.sx, r.x), top: Math.min(r.sy, r.y), width: w, height: h });
+  }
+  function placeSpot() {
+    if (!S.spot) { spotEl.classList.remove('show'); return; }
+    spotEl.classList.add('show');
+    spotEl.style.left = S.spot.x + 'px'; spotEl.style.top = S.spot.y + 'px';
+    spotEl.style.width = S.spot.w + 'px'; spotEl.style.height = S.spot.h + 'px';
+    spotEl.style.setProperty('--dim', S.dim);
+  }
+  function updateSpotCtl() {
+    var c = $('#spotCtl'); c.innerHTML = '';
+    if (!S.spot) { c.classList.remove('show'); return; }
+    c.classList.add('show');
+    c.appendChild(btn('up', '', false, function () { moveSpot(-1); }));
+    c.appendChild(btn('down', '', false, function () { moveSpot(1); }));
+    c.appendChild(btn('rows', '줄 띠', false, function () { var cr = content.getBoundingClientRect(), s = currentPage(); var sr = s ? s.el.getBoundingClientRect() : cr; S.spot.x = sr.left - cr.left; S.spot.w = sr.width; placeSpot(); }));
+    var rg = el('input'); rg.type = 'range'; rg.min = 30; rg.max = 95; rg.value = Math.round(S.dim * 100);
+    rg.addEventListener('input', function () { S.dim = rg.value / 100; placeSpot(); });
+    c.appendChild(rg);
+    c.appendChild(btn('hand', S.tool === 'spot' ? '이동 중' : '이동', S.tool === 'spot', function () { setTool(S.tool === 'spot' ? S.prevTool : 'spot'); }));
+    c.appendChild(btn('x', '', false, function () { S.spot = null; placeSpot(); if (S.tool === 'spot') setTool(S.prevTool); else updateSpotCtl(); buildBars(); }));
+  }
+  function moveSpot(dir) {
+    if (!S.spot) return;
+    S.spot.y = Math.max(0, S.spot.y + dir * S.spot.h * 0.9);
+    placeSpot();
+    var top = S.spot.y - vp.scrollTop;
+    if (top < 40 || top + S.spot.h > vp.clientHeight - 80) vp.scrollTo({ top: S.spot.y - vp.clientHeight * 0.35, behavior: 'smooth' });
+  }
+
+  /* 영역 캡처 → 이미지 카드 */
+  function captureRect(rc) {
+    var cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+    var s = surfAt(document.elementFromPoint(cx, cy)) || null;
+    if (!s) { toast('페이지 안쪽을 드래그하세요'); return; }
+    var sr = s.el.getBoundingClientRect();
+    var x = Math.max(0, rc.left - sr.left), y = Math.max(0, rc.top - sr.top);
+    var w = Math.min(rc.width, sr.width - x), h = Math.min(rc.height, sr.height - y);
+    var out = document.createElement('canvas');
+    var scale = Math.min(2, 1100 / w);
+    out.width = Math.round(w * scale); out.height = Math.round(h * scale);
+    var ctx = out.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, out.width, out.height);
+    [s.pdfCanvas, s.ink].forEach(function (c) {
+      if (!c || !c.width) return;
+      var k = c.width / sr.width;
+      ctx.drawImage(c, x * k, y * k, w * k, h * k, 0, 0, out.width, out.height);
+    });
+    var data = out.toDataURL('image/jpeg', 0.82);
+    post({ type: 'createCardImage', img: data, page: s.num || null });
+    setTool(S.prevTool);
+  }
+
+  /* ═════════════════ 텍스트 선택 → 카드 / 형광펜 ═════════════════ */
+  var selPop = $('#selPop');
+  function hideSelPop() { selPop.classList.remove('show'); }
+  document.addEventListener('selectionchange', debounce(function () {
+    if (S.tool !== 'select') return;
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) { hideSelPop(); return; }
+    var node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    if (!node || !node.closest('.textLayer')) { hideSelPop(); return; }
+    var r = sel.getRangeAt(0).getBoundingClientRect();
+    selPop.innerHTML = '';
+    selPop.appendChild(btn('card', '카드 만들기', false, function () {
+      var s = surfAt(node);
+      post({ type: 'createCard', text: sel.toString().replace(/\s+\n/g, '\n').trim(), page: s ? s.num : null });
+      sel.removeAllRanges(); hideSelPop();
+    }));
+    selPop.appendChild(btn('hl', '형광펜', false, function () { highlightSelection(sel); sel.removeAllRanges(); hideSelPop(); }));
+    selPop.classList.add('show');
+    var pw = selPop.offsetWidth || 220;
+    selPop.style.left = clamp(r.left + r.width / 2 - pw / 2, 8, window.innerWidth - pw - 8) + 'px';
+    selPop.style.top = Math.max(($('#bar').offsetHeight || 50) + 6, r.top - 50) + 'px';
+  }, 250));
+
+  function highlightSelection(sel) {
+    var rects = sel.getRangeAt(0).getClientRects();
+    var bySurf = {};
+    Array.prototype.forEach.call(rects, function (r) {
+      if (r.width < 2) return;
+      var s = surfAt(document.elementFromPoint(r.left + 1, r.top + r.height / 2)); if (!s) return;
+      var sr = s.el.getBoundingClientRect(), k = 1000 / sr.width, y = (r.top + r.height / 2 - sr.top) * k;
+      var st = { t: 'hl', c: S.hl, w: r.height * k * 0.95, p: [(r.left - sr.left) * k, y, 0.5, (r.right - sr.left) * k, y, 0.5] };
+      s.strokes.push(st); (bySurf[s.key] = bySurf[s.key] || []).push(st);
+      pushUndo({ type: 'add', key: s.key, stroke: st });
+    });
+    Object.keys(bySurf).forEach(function (k) { redrawInk(S.surfs[k]); markDirty(k); });
+  }
+
+  /* ═════════════════ 코넬 노트 ═════════════════ */
+  var saveCornell = debounce(function () { post({ type: 'saveDoc', patch: { content: cornellData() } }); }, 700);
+  function cornellData() {
+    var c = S.cornell;
+    return {
+      title: $('.c-title') ? $('.c-title').innerText.trim() : c.title,
+      rows: c.rows.map(function (r) { return { id: r.id, cue: r.cue, text: r.text, h: r.h, ok: r.ok || 0, ng: r.ng || 0 }; }),
+      summary: c.summary
+    };
+  }
+  function buildCornell(data, ink) {
+    var c = S.cornell = {
+      title: data && data.title || S.title || '', rows: (data && data.rows && data.rows.length ? data.rows : [{ id: uid(), cue: '', text: '', h: 260 }, { id: uid(), cue: '', text: '', h: 260 }, { id: uid(), cue: '', text: '', h: 260 }]),
+      summary: data && data.summary || { id: 'root', text: S.title || '핵심 요약', children: [], collapsed: false }
+    };
+    var wrap = el('div', 'cornell');
+    var head = el('div', 'c-head');
+    var title = el('div', 'c-title'); title.contentEditable = 'true'; title.innerText = c.title || '';
+    title.addEventListener('input', saveCornell);
+    head.appendChild(title);
+    var d = new Date(); head.appendChild(el('div', 'c-date', d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate()));
+    wrap.appendChild(head);
+    wrap.appendChild(el('div', 'c-labels', '<div style="width:28%">키워드 · 질문</div><div>필기</div>'));
+    var rowsBox = el('div', 'c-rows'); wrap.appendChild(rowsBox);
+    var addBtn = el('button', 'c-add', '＋ 행 추가'); addBtn.onclick = function () { addRow(); }; wrap.appendChild(addBtn);
+    var sum = el('div', 'c-sum');
+    sum.innerHTML = '<h4>요약 · 마인드맵 <button data-a="open">모두 펼치기</button><button data-a="close">모두 접기</button></h4><div class="mm-scroll"></div>';
+    sum.querySelector('[data-a=open]').onclick = function () { walk(c.summary, function (n) { n.collapsed = false; }); renderMM(); saveCornell(); };
+    sum.querySelector('[data-a=close]').onclick = function () { walk(c.summary, function (n) { if (n.id !== 'root') n.collapsed = true; }); renderMM(); saveCornell(); };
+    wrap.appendChild(sum);
+    content.insertBefore(wrap, spotEl);
+    c.rows.forEach(function (r) { rowsBox.appendChild(rowEl(r, ink['r_' + r.id])); });
+    layout();
+    renderMM();
+  }
+  function rowEl(r, inkData) {
+    var row = el('div', 'crow'); row.dataset.id = r.id;
+    var cue = el('div', 'cue'); cue.contentEditable = S.study ? 'false' : 'true'; cue.innerText = r.cue || '';
+    cue.addEventListener('input', function () { r.cue = cue.innerText.trim(); saveCornell(); });
+    cue.addEventListener('click', function () { if (S.study) toggleBlind(row, r); });
+    var note = el('div', 'cnote');
+    var nt = el('div', 'ntext'); nt.contentEditable = 'true'; nt.innerText = r.text || '';
+    nt.addEventListener('input', function () { r.text = nt.innerText.trim(); saveCornell(); });
+    var area = el('div', 'inkarea');
+    var s = makeSurf('r_' + r.id, area, (r.h || 260) / 1000, 'cell', inkData);
+    s.row = r;
+    var blind = el('div', 'blind', '🙈 가려짐<small>키워드를 보고 떠올린 뒤 탭해서 확인</small>');
+    blind.addEventListener('click', function () { toggleBlind(row, r); });
+    var grip = el('div', 'rgrip', '<i></i>');
+    gripResize(grip, s, r);
+    var judge = el('div', 'judge');
+    var ok = el('button', '', '✓ 맞음'); ok.style.background = '#30A46C';
+    var ng = el('button', '', '✗ 틀림'); ng.style.background = '#E5484D';
+    ok.onclick = function () { r.ok = (r.ok || 0) + 1; row.classList.remove('judging'); updScore(); saveCornell(); };
+    ng.onclick = function () { r.ng = (r.ng || 0) + 1; row.classList.remove('judging'); updScore(); saveCornell(); };
+    judge.appendChild(ok); judge.appendChild(ng);
+    var score = el('div', 'score');
+    function updScore() { score.textContent = (r.ok || r.ng) ? '✓' + (r.ok || 0) + ' ✗' + (r.ng || 0) : ''; }
+    updScore();
+    var tools = el('div', 'rtools');
+    var eye = el('button', '', '👁'); eye.onclick = function () { toggleBlind(row, r); };
+    var cardB = el('button', '', '카드'); cardB.onclick = function () { exportRow(r); };
+    var del = el('button', '', '삭제'); del.onclick = function () { deleteRow(r, row); };
+    tools.appendChild(eye); tools.appendChild(cardB); tools.appendChild(del);
+    note.appendChild(nt); note.appendChild(area); note.appendChild(blind); note.appendChild(judge);
+    row.appendChild(cue); row.appendChild(note); row.appendChild(tools); row.appendChild(score);
+    area.appendChild(grip);
+    io.observe(area);
+    if (S.study) row.classList.add('blinded');
+    return row;
+  }
+  function gripResize(grip, s, r) {
+    var st = null;
+    grip.addEventListener('pointerdown', function (e) { e.stopPropagation(); e.preventDefault(); st = { y: e.clientY, h: r.h || 260, id: e.pointerId }; grip.setPointerCapture(e.pointerId); });
+    grip.addEventListener('pointermove', function (e) {
+      if (!st) return;
+      var k = 1000 / surfW(s);
+      r.h = clamp(st.h + (e.clientY - st.y) * k, 80, 3000);
+      s.ratio = r.h / 1000; s.el.style.height = Math.round(surfW(s) * s.ratio) + 'px'; redrawInk(s);
+    });
+    grip.addEventListener('pointerup', function () { if (st) { st = null; saveCornell(); } });
+  }
+  function toggleBlind(row, r) {
+    var was = row.classList.contains('blinded');
+    row.classList.toggle('blinded', !was);
+    if (was && S.study) row.classList.add('judging');
+    else row.classList.remove('judging');
+  }
+  function blindAll(on) { Array.prototype.forEach.call(document.querySelectorAll('.crow'), function (row) { row.classList.toggle('blinded', on); row.classList.remove('judging'); }); }
+  function setStudy(on) {
+    S.study = on;
+    document.body.classList.toggle('study', on);
+    Array.prototype.forEach.call(document.querySelectorAll('.cue'), function (c) { c.contentEditable = on ? 'false' : 'true'; });
+    blindAll(on);
+    buildBars();
+    toast(on ? '암기 모드: 키워드를 탭하면 필기가 가려지거나 드러나요' : '편집 모드');
+  }
+  function addRow() {
+    var r = { id: uid(), cue: '', text: '', h: 260 };
+    S.cornell.rows.push(r);
+    var e = rowEl(r, '');
+    $('.c-rows').appendChild(e);
+    layout(); renderSurf(S.surfs['r_' + r.id], true);
+    saveCornell();
+    setTimeout(function () { e.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 30);
+  }
+  function deleteRow(r, row) {
+    modal('<h3>이 행을 삭제할까요?</h3><p>키워드와 필기가 함께 지워져요.</p><div class="acts"><button id="mcancel">취소</button><button class="pri" id="mok" style="background:#E5484D">삭제</button></div>');
+    $('#mcancel').onclick = closeModal;
+    $('#mok').onclick = function () { closeModal(); reallyDeleteRow(r, row); };
+  }
+  function reallyDeleteRow(r, row) {
+    S.cornell.rows = S.cornell.rows.filter(function (x) { return x !== r; });
+    var k = 'r_' + r.id; io.unobserve(S.surfs[k].el); delete S.surfs[k]; S.order = S.order.filter(function (x) { return x !== k; });
+    row.remove(); saveCornell();
+    post({ type: 'saveInk', key: k, data: '' });
+  }
+  function surfImage(s) {
+    if (!s || !s.strokes.length) return null;
+    var w = surfW(s), h = w * s.ratio, scale = Math.min(1.5, 900 / w);
+    var c = document.createElement('canvas'); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+    var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    // 획이 있는 범위만 잘라내기
+    var bb = [Infinity, Infinity, -Infinity, -Infinity];
+    s.strokes.forEach(function (st) { var b = bbox(st); bb[0] = Math.min(bb[0], b[0]); bb[1] = Math.min(bb[1], b[1]); bb[2] = Math.max(bb[2], b[2]); bb[3] = Math.max(bb[3], b[3]); });
+    var k = c.width / 1000;
+    s.strokes.forEach(function (st) { if (st.t === 'hl') drawStroke(ctx, st, k); });
+    s.strokes.forEach(function (st) { if (st.t !== 'hl') drawStroke(ctx, st, k); });
+    var pad = 20, x0 = Math.max(0, (bb[0] - pad) * k), y0 = Math.max(0, (bb[1] - pad) * k);
+    var x1 = Math.min(c.width, (bb[2] + pad) * k), y1 = Math.min(c.height, (bb[3] + pad) * k);
+    var o = document.createElement('canvas'); o.width = Math.max(10, x1 - x0); o.height = Math.max(10, y1 - y0);
+    var oc = o.getContext('2d'); oc.fillStyle = '#fff'; oc.fillRect(0, 0, o.width, o.height);
+    oc.drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+    return o.toDataURL('image/jpeg', 0.8);
+  }
+  function exportRow(r) {
+    if (!r.cue) { toast('키워드를 먼저 적어주세요'); return; }
+    post({ type: 'createCard', text: null, front: r.cue, back: r.text || '', backImg: surfImage(S.surfs['r_' + r.id]) });
+  }
+  function exportAllRows() {
+    var cards = S.cornell.rows.filter(function (r) { return r.cue; }).map(function (r) {
+      return { front: r.cue, back: r.text || '', backImg: surfImage(S.surfs['r_' + r.id]) };
+    });
+    if (!cards.length) { toast('키워드가 적힌 행이 없어요'); return; }
+    post({ type: 'createCards', cards: cards });
+  }
+
+  /* 마인드맵 */
+  var BRANCH = ['#3E63DD', '#E5484D', '#30A46C', '#F76B15', '#8E4EC6', '#12A594', '#D6409F'];
+  function walk(n, f) { f(n); (n.children || []).forEach(function (c) { walk(c, f); }); }
+  function findParent(n, id) { for (var i = 0; i < (n.children || []).length; i++) { var c = n.children[i]; if (c.id === id) return n; var p = findParent(c, id); if (p) return p; } return null; }
+  function renderMM() {
+    var box = $('.mm-scroll'); if (!box) return;
+    box.innerHTML = '';
+    box.appendChild(mmNode(S.cornell.summary, 0, '#3E63DD'));
+  }
+  function mmNode(n, depth, color) {
+    n.children = n.children || [];
+    var e = el('div', 'mm-node' + (depth === 0 ? ' root' : '') + (n.children.length ? ' has-kids' : '') + (n.collapsed ? ' collapsed' : ''));
+    e.style.setProperty('--c', color);
+    var b = el('div', 'mm-box');
+    if (n.children.length) {
+      var tg = el('button', '', n.collapsed ? '▸' : '▾');
+      tg.onclick = function () { n.collapsed = !n.collapsed; renderMM(); saveCornell(); };
+      b.appendChild(tg);
+    }
+    var tx = el('span', 'mm-text'); tx.contentEditable = 'true'; tx.innerText = n.text || '';
+    tx.addEventListener('input', function () { n.text = tx.innerText.trim(); saveCornell(); });
+    b.appendChild(tx);
+    var add = el('button', '', '＋'); add.title = '하위 추가';
+    add.onclick = function () { n.children.push({ id: uid(), text: '', children: [], collapsed: false }); n.collapsed = false; renderMM(); saveCornell(); focusLast(n); };
+    b.appendChild(add);
+    if (depth > 0) {
+      var del = el('button', '', '×');
+      del.onclick = function () { var p = findParent(S.cornell.summary, n.id); if (p) { p.children = p.children.filter(function (c) { return c !== n; }); renderMM(); saveCornell(); } };
+      b.appendChild(del);
+    }
+    e.appendChild(b);
+    var kids = el('div', 'mm-children');
+    n.children.forEach(function (c, i) { kids.appendChild(mmNode(c, depth + 1, depth === 0 ? BRANCH[i % BRANCH.length] : color)); });
+    e.appendChild(kids);
+    return e;
+  }
+  function focusLast(n) {
+    setTimeout(function () {
+      var all = document.querySelectorAll('.mm-text'); var t = all[all.length - 1];
+      // 방금 추가한 노드 찾기: 내용이 빈 마지막 노드
+      for (var i = all.length - 1; i >= 0; i--) if (!all[i].innerText.trim()) { t = all[i]; break; }
+      if (t) t.focus();
+    }, 30);
+  }
+
+  /* ═════════════════ PDF 불러오기 ═════════════════ */
+  var pdfjsReady = null;
+  function loadPdfjs() {
+    if (pdfjsReady) return pdfjsReady;
+    var base = new URL('.', document.baseURI).href;
+    pdfjsReady = import(base + 'pdf.min.mjs').then(function (lib) {
+      var workerUrl = base + 'pdf.worker.min.mjs';
+      var same = false;
+      try { same = new URL(base).origin === self.origin; } catch (e) {}
+      if (same || typeof Worker === 'undefined') lib.GlobalWorkerOptions.workerSrc = workerUrl;
+      else {
+        // 웹 버전(iframe): 다른 출처의 워커는 바로 못 띄우므로 같은 출처 blob 워커가 CDN 모듈을 불러오게 함
+        try {
+          var blob = new Blob(['import "' + workerUrl + '";'], { type: 'text/javascript' });
+          lib.GlobalWorkerOptions.workerPort = new Worker(URL.createObjectURL(blob), { type: 'module' });
+        } catch (e) { lib.GlobalWorkerOptions.workerSrc = workerUrl; }
+      }
+      window.pdfjsLib = lib;
+      return lib;
+    });
+    return pdfjsReady;
+  }
+  function b64ToBytes(parts) {
+    var bin = atob(parts.join(''));
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function openPdf(bytes) {
+    return loadPdfjs().then(function (lib) {
+      var root = new URL('../../', document.baseURI).href;
+      return lib.getDocument({ data: bytes, cMapUrl: root + 'cmaps/', cMapPacked: true, standardFontDataUrl: root + 'standard_fonts/', wasmUrl: root + 'wasm/', isEvalSupported: false }).promise;
+    });
+  }
+  function setLoading(text, frac) {
+    var l = $('#loading');
+    if (text === null) { l.style.display = 'none'; return; }
+    l.style.display = 'flex'; $('#loadingText').textContent = text;
+    if (frac !== undefined) $('#loadingBar').style.width = Math.round(frac * 100) + '%';
+  }
+
+  /* ═════════════════ RN → 엔진 ═════════════════ */
+  var initData = null;
+  function receive(msg) {
+    if (typeof msg === 'string') msg = JSON.parse(msg);
+    if (msg.type === 'init') return init(msg);
+    if (msg.type === 'chunk') {
+      var arr = S.chunks[msg.key] = S.chunks[msg.key] || [];
+      arr.push(msg.data);
+      if (msg.key === 'main') setLoading('PDF 불러오는 중…', msg.n ? (msg.i + 1) / msg.n : undefined);
+      if (msg.last) {
+        var bytes = b64ToBytes(arr); S.chunks[msg.key] = [];
+        if (msg.key === 'main') {
+          openPdf(bytes).then(function (pdf) {
+            S.pdf = pdf;
+            return buildPdfPages(pdf, initData.ink || {});
+          }).then(function () {
+            setLoading(null);
+            jumpTo(initData.lastPage);
+          }).catch(function (e) { setLoading('PDF를 열 수 없어요: ' + e.message); post({ type: 'error', message: String(e && e.message || e) }); });
+        } else {
+          openPdf(bytes).then(function (pdf) {
+            S.src = pdf;
+            if (msg.srcStart) S.srcStart = msg.srcStart;
+            S.order.forEach(function (k) { S.surfs[k].overlayFor = null; });
+            if (S.pendingCompare || S.compare) { S.pendingCompare = false; S.compare = false; setCompare(true); }
+            else toast('원본이 연결됐어요 · 「원본 대조」를 눌러보세요');
+          }).catch(function (e) { toast('원본 PDF를 열 수 없어요'); });
+        }
+      }
+      return;
+    }
+    if (msg.type === 'toast') return toast(msg.text);
+    if (msg.type === 'flush') return flushNow();
+  }
+  function flushNow() {
+    Object.keys(dirty).forEach(function (k) { var s = S.surfs[k]; if (s) post({ type: 'saveInk', key: k, data: encodeStrokes(s.strokes) }); });
+    dirty = {};
+    if (S.mode === 'cornell' && S.cornell) post({ type: 'saveDoc', patch: { content: cornellData() } });
+  }
+  function jumpTo(n) {
+    var s = S.surfs['p' + n];
+    if (s && n > 1) vp.scrollTop = s.el.offsetTop - 8;
+    updatePageInd();
+  }
+  function init(d) {
+    initData = d;
+    S.mode = d.mode; S.fileId = d.fileId; S.title = d.title || ''; S.template = d.template || 'blank';
+    S.penOnly = d.penOnly !== false;
+    if (d.prefs) { if (d.prefs.color) S.color = d.prefs.color; if (d.prefs.penW !== undefined) S.penW = d.prefs.penW; }
+    document.body.classList.toggle('dark', !!d.dark);
+    var c = d.content || {};
+    if (d.mode === 'recall') { S.srcMap = c.srcMap || {}; S.srcStart = d.srcStart || 1; }
+    buildBars();
+    measureBars();
+    if (d.mode === 'pdf') { setLoading('PDF 불러오는 중…', 0); loadPdfjs(); }
+    else {
+      if (d.mode === 'cornell') buildCornell(c, d.ink || {});
+      else buildBlankPages(Math.max(1, d.pageCount || 1), d.ink || {});
+      setLoading(null);
+      if (d.mode !== 'cornell') jumpTo(d.lastPage || 1);
+      if (d.mode === 'recall' && d.hasSource) loadPdfjs();
+    }
+  }
+  window.addEventListener('resize', debounce(function () { measureBars(); layout(); rerenderSoon(); }, 150));
+
+  window.Engine = { receive: receive, state: S, _encode: encodeStrokes, _decode: decodeStrokes };
+  post({ type: 'ready' });
+})();
+</script>
+</body>
+</html>
