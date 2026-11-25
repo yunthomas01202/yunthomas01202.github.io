@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { useColorScheme } from 'react-native';
+import { alpha } from './lib/color';
 import { useData } from './lib/store';
 
 export interface Theme {
@@ -68,9 +70,36 @@ export const darkTheme: Theme = {
   ...shared,
 };
 
+/** 꾸미기에서 고를 수 있는 강조색 */
+export const ACCENTS = [
+  { name: '보라', color: '#4F46E5' },
+  { name: '파랑', color: '#2563EB' },
+  { name: '하늘', color: '#0EA5E9' },
+  { name: '민트', color: '#0D9488' },
+  { name: '초록', color: '#16A34A' },
+  { name: '노랑', color: '#D97706' },
+  { name: '주황', color: '#EA580C' },
+  { name: '빨강', color: '#DC2626' },
+  { name: '분홍', color: '#DB2777' },
+  { name: '자두', color: '#9333EA' },
+  { name: '먹색', color: '#334155' },
+];
+
+function lighten(hex: string, k: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(c + (255 - c) * k));
+  return '#' + ch.map((c) => c.toString(16).padStart(2, '0')).join('');
+}
+
 export function useTheme(): Theme {
   const scheme = useColorScheme();
   const pref = useData((s) => s.settings.theme);
+  const accent = useData((s) => s.settings.accent);
   const dark = pref === 'system' ? scheme === 'dark' : pref === 'dark';
-  return dark ? darkTheme : lightTheme;
+  return useMemo(() => {
+    const base = dark ? darkTheme : lightTheme;
+    if (!accent || !/^#[0-9a-fA-F]{6}$/.test(accent)) return base;
+    const primary = dark ? lighten(accent, 0.3) : accent;
+    return { ...base, primary, primarySoft: dark ? alpha(primary, 0.18) : lighten(accent, 0.88) };
+  }, [dark, accent]);
 }

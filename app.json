@@ -3,7 +3,7 @@
     "name": "학습지원",
     "slug": "ultimate-study",
     "scheme": "ultimatestudy",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -38,7 +38,7 @@
         "backgroundColor": "#1F1760",
         "monochromeImage": "./assets/adaptive-icon.png"
       },
-      "versionCode": 2
+      "versionCode": 3
     },
     "plugins": [
       "expo-router",
@@ -68,6 +68,21 @@
         {
           "appleTeamId": "YOUR_APPLE_TEAM_ID",
           "appGroup": "group.com.thiomasas.ultimatestudy"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "오답 노트에 문제 사진을 넣으려면 사진 접근이 필요해요.",
+          "cameraPermission": "오답 노트에 틀린 문제를 찍으려면 카메라가 필요해요.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ]
     ],

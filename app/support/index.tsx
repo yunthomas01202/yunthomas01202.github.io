@@ -29,6 +29,12 @@ export default function SupportHub() {
     { title: '무음 타이머', desc: '소리 없이 화면으로만', icon: 'hourglass' as const, color: '#3E63DD', route: '/support/timer' },
     { title: '공부 리포트', desc: '일·주·월 그래프', icon: 'bar-chart' as const, color: '#8E4EC6', route: '/support/report' },
     { title: '앱 잠금', desc: '공부 중 다른 앱 막기', icon: 'lock-closed' as const, color: '#E5484D', route: '/support/lock' },
+    { title: '오답 노트', desc: '사진 찍고 1·3·7일 복습', icon: 'document-text' as const, color: '#E5484D', route: '/support/wrong' },
+    { title: '마감 트래커', desc: '수행평가 · 숙제', icon: 'alarm-outline' as const, color: '#F76B15', route: '/support/homework' },
+    { title: '연속 공부', desc: '잔디 심기', icon: 'leaf' as const, color: '#30A46C', route: '/support/streak' },
+    { title: '급식 · 학사일정', desc: '나이스에서 불러오기', icon: 'school' as const, color: '#16A34A', route: '/support/school' },
+    { title: '공부 배경음', desc: '빗소리 · 카페 · 백색소음', icon: 'headset' as const, color: '#0EA5E9', route: '/support/sound' },
+    { title: '수면 계산기', desc: '90분 주기 맞추기', icon: 'moon' as const, color: '#6E56CF', route: '/support/sleep' },
     { title: '알람', desc: '벨 · 진동 · 내 음악', icon: 'alarm' as const, color: '#F5A524', route: '/support/alarm' },
     { title: '링크', desc: links.length ? `${links.length}개 바로가기` : '자주 가는 사이트', icon: 'link' as const, color: '#687076', route: '/support/links' },
   ];

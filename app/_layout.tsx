@@ -12,6 +12,7 @@ import { Btn, OverlayHost, T, toast } from '../src/components/ui';
 import { useTheme } from '../src/theme';
 import { FAILURE_SNOOZE_KEY, overdueTasks } from '../src/features/planner/logic';
 import { rescheduleReminders } from '../src/lib/notify';
+import { BackgroundSync } from '../src/features/extra/BackgroundSync';
 import { retryPendingUploads } from '../src/lib/files';
 import { releaseExpiredLock } from '../src/lib/applock';
 import { fmtTime } from '../src/lib/date';
@@ -45,6 +46,7 @@ export default function RootLayout() {
         </Stack>
         {user && ready && <AppEffects />}
         {user && ready && <HotkeyHelp />}
+        {user && ready && <BackgroundSync />}
         {(initializing || !user || !ready) && (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
             {initializing || (user && !ready) ? <Splash text={user ? '데이터를 불러오는 중…' : undefined} /> : <Login />}

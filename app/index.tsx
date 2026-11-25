@@ -13,6 +13,7 @@ import { Ring } from '../src/components/charts';
 import { alpha } from '../src/lib/color';
 import { daysUntil, ddayLabel, fmtKDate, fmtShortDur, fmtTime, ymd } from '../src/lib/date';
 import { useRunningTimer } from '../src/features/support/timerStore';
+import { ExtraShortcuts, NowNextCard } from '../src/features/extra/HomeExtras';
 
 export default function Home() {
   const t = useTheme();
@@ -24,6 +25,7 @@ export default function Home() {
   const perfItems = useList('perfItems');
   const categories = useData((s) => s.perfCategories);
   const events = useList('events');
+  const homework = useList('homework');
   const cards = useList('cards');
   const sessions = useList('sessions');
   const running = useRunningTimer();
@@ -58,6 +60,12 @@ export default function Home() {
       if (d < 0 || d > 14) continue;
       out.push({ key: 'e' + e.id, date: e.date, title: e.title, sub: '일정', color: e.color, route: '/perf' });
     }
+    for (const h of homework) {
+      if (h.done) continue;
+      const d = daysUntil(h.due);
+      if (d < 0 || d > 14) continue;
+      out.push({ key: 'h' + h.id, date: h.due, title: h.title, sub: h.subject || '마감', color: '#F76B15', route: '/support/homework' });
+    }
     for (const s of seasons) {
       if (s.archived) continue;
       for (const ex of s.exams || []) {
@@ -74,7 +82,7 @@ export default function Home() {
       }
     }
     return out.sort((a, b) => a.date.localeCompare(b.date));
-  }, [perfItems, events, seasons, categories, t]);
+  }, [perfItems, events, homework, seasons, categories, t]);
 
   const wide = width >= 700;
   const sections = [
@@ -135,6 +143,8 @@ export default function Home() {
             )}
           </Pressable>
         </Row>
+
+        <NowNextCard />
 
         {/* 오늘 요약 */}
         <Card onPress={() => router.push('/planner/today')} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -221,6 +231,8 @@ export default function Home() {
             </Pressable>
           ))}
         </Row>
+
+        <ExtraShortcuts />
 
         {/* 2주 이내 */}
         <SectionTitle title="다가오는 일 · 2주 이내" />

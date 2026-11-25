@@ -1,4 +1,5 @@
 // 공통 UI 컴포넌트 모음
+import { customFontWeightSafe, useAppFont } from '../lib/fonts';
 import React, { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -62,11 +63,17 @@ export function T({
   center?: boolean;
 }) {
   const t = useTheme();
+  const font = useAppFont();
   return (
     <Text
       numberOfLines={numberOfLines}
       style={[
-        { fontSize: size, fontWeight: weight, color: color || (faint ? t.textFaint : sub ? t.textSub : t.text) },
+        {
+          fontSize: Math.round(size * font.scale * 10) / 10,
+          fontWeight: font.family && customFontWeightSafe ? undefined : weight,
+          color: color || (faint ? t.textFaint : sub ? t.textSub : t.text),
+        },
+        font.family ? { fontFamily: font.family } : null,
         center && { textAlign: 'center' },
         style,
       ]}

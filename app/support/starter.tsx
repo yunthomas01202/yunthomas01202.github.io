@@ -1,4 +1,5 @@
 // 5분 예열: 하기 싫은 과목은 '딱 5분만' → 5분이 지나면 계속할지 묻기
+import { AmbientPanel } from '../../src/features/extra/AmbientPanel';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -174,6 +175,7 @@ export default function Starter() {
         })
       )}
       <Btn title="그냥 5분 시작" variant="secondary" color="#F76B15" style={{ marginTop: 10 }} onPress={() => begin(null, '예열', '#F76B15')} />
+      <AmbientPanel compact style={{ marginTop: 12 }} />
     </Screen>
   );
 }

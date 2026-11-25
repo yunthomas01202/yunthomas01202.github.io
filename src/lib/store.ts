@@ -34,6 +34,8 @@ import type {
   QuickLink,
   RecallLog,
   Schedule,
+  WrongNote,
+  Homework,
   Season,
   Settings,
   StudyApp,
@@ -61,6 +63,8 @@ export const COLLECTIONS = [
   'links',
   'recallLogs',
   'schedules',
+  'wrongNotes',
+  'homework',
 ] as const;
 
 export type CollName = (typeof COLLECTIONS)[number];
@@ -82,6 +86,8 @@ export interface CollTypes {
   links: QuickLink;
   recallLogs: RecallLog;
   schedules: Schedule;
+  wrongNotes: WrongNote;
+  homework: Homework;
 }
 
 type Maps = { [K in CollName]: Record<ID, CollTypes[K]> };

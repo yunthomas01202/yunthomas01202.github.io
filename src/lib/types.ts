@@ -248,6 +248,35 @@ export interface Schedule extends Base {
 
 /* ───────── 설정 ───────── */
 
+/** 오답 노트: 틀린 문제 사진 + 간격 반복 (1·3·7·14일) */
+export interface WrongNote extends Base {
+  subject: string;
+  title: string;
+  /** 작게 줄인 JPEG data URL (동기화되도록 문서 안에 저장) */
+  image?: string | null;
+  note?: string;
+  answer?: string;
+  /** 0~4: 몇 번째 복습까지 했는지 (4면 졸업) */
+  stage: number;
+  /** 다음 복습 날짜 YYYY-MM-DD (졸업하면 null) */
+  nextReview: string | null;
+  lastReviewed?: number | null;
+  wrongCount: number;
+}
+
+/** 수행평가·숙제 마감 */
+export type HomeworkKind = 'perf' | 'homework' | 'exam' | 'etc';
+export interface Homework extends Base {
+  title: string;
+  subject: string;
+  kind: HomeworkKind;
+  due: string; // YYYY-MM-DD
+  dueMin?: number | null; // 마감 시각(분). 없으면 하루 종일
+  note?: string;
+  done: boolean;
+  doneAt?: number | null;
+}
+
 export interface Place {
   id: string;
   name: string;
@@ -279,6 +308,28 @@ export interface Settings {
   hotkeys?: boolean;
   /** 구글 드라이브의 '학습지원' 폴더 id */
   driveFolderId?: string | null;
+  /** 스트릭: 하루 최소 공부(분) */
+  streakMin?: number;
+  /** 꾸미기: 강조색 (없으면 기본 보라) */
+  accent?: string | null;
+  /** 꾸미기: 글꼴 */
+  font?: 'system' | 'round' | 'serif' | 'mono';
+  /** 꾸미기: 글자 크기 배율 */
+  fontScale?: number;
+  /** 꾸미기: 위젯 스타일 */
+  widgetStyle?: 'dark' | 'light' | 'accent' | 'glass';
+  /** 달력 스티커: 날짜 → 이모지 */
+  stickers?: Record<string, string>;
+  /** 나이스(NEIS) 학교 */
+  school?: { office: string; code: string; name: string; grade?: number; klass?: number } | null;
+  /** 나이스 오픈API 인증키 (선택) */
+  neisKey?: string | null;
+  /** 마감 알림 */
+  homeworkNotify?: { dayBefore: boolean; dayBeforeHour: number; dayOf: boolean; dayOfHour: number };
+  /** 오답 복습 알림 시각 */
+  wrongNotifyHour?: number;
+  /** 수면 계산기 */
+  sleep?: { wake: number; fallAsleepMin: number; bedRemind: boolean; cycles: number };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -305,6 +356,24 @@ export const DEFAULT_SETTINGS: Settings = {
   trackAway: true,
   focusFullscreen: true,
   hotkeys: true,
+  streakMin: 10,
+  accent: null,
+  font: 'system',
+  fontScale: 1,
+  widgetStyle: 'dark',
+  stickers: {},
+  school: null,
+  neisKey: null,
+  homeworkNotify: { dayBefore: true, dayBeforeHour: 20, dayOf: true, dayOfHour: 7 },
+  wrongNotifyHour: 19,
+  sleep: { wake: 6 * 60 + 30, fallAsleepMin: 15, bedRemind: false, cycles: 5 },
+};
+
+export const HOMEWORK_KIND_LABEL: Record<HomeworkKind, string> = {
+  perf: '수행평가',
+  homework: '숙제',
+  exam: '시험',
+  etc: '기타',
 };
 
 export const TASK_KIND_LABEL: Record<TaskKind, string> = {

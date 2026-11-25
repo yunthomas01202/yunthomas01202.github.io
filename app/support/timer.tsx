@@ -9,6 +9,8 @@ import { Btn, Card, Chip, Row, Screen, Stepper, T, ToggleRow } from '../../src/c
 import { Ring } from '../../src/components/charts';
 import { useTick } from '../../src/features/support/timerStore';
 import { cancelById, scheduleAt } from '../../src/lib/notify';
+import { onTimerFinished } from '../../src/lib/ambient';
+import { AmbientPanel } from '../../src/features/extra/AmbientPanel';
 
 interface TState {
   total: number; // 초
@@ -42,6 +44,7 @@ export default function SilentTimer() {
     if (running && left <= 0 && !s.finished) {
       useT.setState({ endAt: null, pausedLeft: null, finished: true });
       cancelById(s.notifId);
+      onTimerFinished();
       if (s.vibrate && Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 500);
@@ -124,6 +127,7 @@ export default function SilentTimer() {
             : '앱을 나가도 끝나는 시각에 소리 없는 알림이 와요. 진행 중엔 화면이 꺼지지 않아요.'}
         </T>
       </Card>
+      <AmbientPanel compact style={{ marginTop: 12 }} />
     </Screen>
   );
 }

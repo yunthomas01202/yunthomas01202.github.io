@@ -1,8 +1,9 @@
 // 설정: 계정, 장소 태그, 스탯 축, 캘린더, 알림, 테마, 데이터
 import React, { useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Platform, Share, View } from 'react-native';
-import { useTheme } from '../src/theme';
+import { Image, Platform, Pressable, Share, View } from 'react-native';
+import { ACCENTS, useTheme } from '../src/theme';
+import { FONT_LABEL, type FontKey } from '../src/lib/fonts';
 import { signOut, useAuth } from '../src/lib/auth';
 import { COLLECTIONS, LOCAL_UID, getState, newId, updateSettings, useData, useList } from '../src/lib/store';
 import { ScheduleEditor, ScheduleManager, SchoolBuilder } from '../src/features/planner/ScheduleSheets';
@@ -267,6 +268,51 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      <SectionTitle title="꾸미기" />
+      <Card>
+        <Label>강조색</Label>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+          {ACCENTS.map((a) => {
+            const sel = (st.accent || '#4F46E5') === a.color;
+            return (
+              <Pressable key={a.color} onPress={() => set({ accent: a.color === '#4F46E5' ? null : a.color })} style={{ alignItems: 'center', width: 44 }}>
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: a.color, borderWidth: sel ? 3 : 0, borderColor: t.text, alignItems: 'center', justifyContent: 'center' }}>
+                  {sel ? <Ionicons name="checkmark" size={18} color="#fff" /> : null}
+                </View>
+                <T size={10} sub style={{ marginTop: 3 }}>
+                  {a.name}
+                </T>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Label>글꼴</Label>
+        <Row wrap style={{ marginBottom: 12 }}>
+          {(Object.keys(FONT_LABEL) as FontKey[]).map((k) => (
+            <Chip key={k} small label={FONT_LABEL[k]} selected={(st.font || 'system') === k} onPress={() => set({ font: k })} />
+          ))}
+        </Row>
+        <Row style={{ marginBottom: 12 }}>
+          <T style={{ flex: 1 }}>글자 크기</T>
+          <Stepper value={Math.round((st.fontScale || 1) * 100)} onChange={(v) => set({ fontScale: v / 100 })} step={5} min={85} max={130} format={(v) => `${v}%`} />
+        </Row>
+        <Label>홈 화면 위젯 스타일 (안드로이드)</Label>
+        <Segmented
+          value={st.widgetStyle || 'dark'}
+          onChange={(v) => set({ widgetStyle: v })}
+          options={[
+            { value: 'dark', label: '어둡게' },
+            { value: 'light', label: '밝게' },
+            { value: 'accent', label: '강조색' },
+            { value: 'glass', label: '투명' },
+          ]}
+          style={{ marginBottom: 10 }}
+        />
+        <T size={12} faint>
+          달력 스티커: 캘린더 월 보기에서 날짜를 길게 누르면 붙일 수 있어요. 위젯은 홈 화면을 길게 눌러 '위젯 → 학습지원'에서 추가하세요.
+        </T>
+      </Card>
+
       <SectionTitle title="데이터" />
       <Card>
         <T size={12} sub style={{ marginBottom: 10 }}>
@@ -302,7 +348,7 @@ export default function SettingsScreen() {
         />
       </Card>
       <T size={11} faint center style={{ marginTop: 24 }}>
-        학습지원 v1.1
+        학습지원 v1.2
       </T>
       <ScheduleEditor visible={edit.open} schedule={edit.schedule} draft={FIXED_DRAFT} onClose={() => setEdit({ open: false, schedule: null })} />
       <ScheduleManager

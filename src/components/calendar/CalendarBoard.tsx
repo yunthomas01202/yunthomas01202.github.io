@@ -20,7 +20,24 @@ import {
   ymd,
 } from '../../lib/date';
 import { layoutLanes } from '../../features/planner/logic';
-import { IconBtn, Segmented, haptic } from '../ui';
+import { IconBtn, Segmented, haptic, showActions } from '../ui';
+import { getState, updateSettings, useData } from '../../lib/store';
+
+export const STICKERS = ['⭐', '❤️', '🔥', '🎉', '📚', '✏️', '🏃', '🎂', '😴', '🍀', '✈️', '🎮', '💯', '⚠️'];
+
+export function pickSticker(day: string) {
+  const cur = getState().settings.stickers || {};
+  const setS = (e: string | null) => {
+    const next = { ...cur };
+    if (e) next[day] = e;
+    else delete next[day];
+    updateSettings({ stickers: next });
+  };
+  showActions(`${day.slice(5).replace('-', '/')} 스티커`, [
+    ...STICKERS.map((e) => ({ label: e, onPress: () => setS(e) })),
+    ...(cur[day] ? [{ label: '스티커 떼기', destructive: true, onPress: () => setS(null) }] : []),
+  ]);
+}
 import { DragPayload, Draggable, measureView, useDragActions, useDragActive } from './drag';
 
 export type CalMode = 'day' | 'week' | 'month';
@@ -668,6 +685,7 @@ function MonthGrid(props: CalendarBoardProps) {
 
   const heads = props.weekStartsOn === 1 ? ['월', '화', '수', '목', '금', '토', '일'] : ['일', '월', '화', '수', '목', '금', '토'];
   const today = ymd();
+  const stickers = useData((s) => s.settings.stickers) || {};
 
   return (
     <View style={{ flex: 1, paddingHorizontal: 4, paddingBottom: 4 }}>
@@ -696,6 +714,8 @@ function MonthGrid(props: CalendarBoardProps) {
                 <Pressable
                   key={k}
                   onPress={() => props.onPressDay?.(k)}
+                  onLongPress={() => pickSticker(k)}
+                  delayLongPress={450}
                   style={{
                     flex: 1,
                     margin: 1,
@@ -718,6 +738,7 @@ function MonthGrid(props: CalendarBoardProps) {
                   >
                     {d.getDate()}
                   </Text>
+                  {stickers[k] ? <Text style={{ position: 'absolute', top: 1, right: 2, fontSize: 13 }}>{stickers[k]}</Text> : null}
                   {items.slice(0, 3).map((it) =>
                     it.all ? (
                       <View key={it.id} style={{ backgroundColor: it.color, borderRadius: 3, paddingHorizontal: 2, marginTop: 1 }}>

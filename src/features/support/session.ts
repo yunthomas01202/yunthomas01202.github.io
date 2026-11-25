@@ -1,3 +1,4 @@
+import { onTimerFinished } from '../../lib/ambient';
 // 공부 시작/끝 (앱 잠금 연동 포함)
 import { getState } from '../../lib/store';
 import { haptic, toast } from '../../components/ui';
@@ -18,6 +19,7 @@ export async function beginStudy(subject: string, color: string, taskId?: string
 export async function endStudy(save = true): Promise<number> {
   const s = getState();
   const sec = stopTimer(save);
+  onTimerFinished();
   if (s.settings.lockApps.withTimer && lockAvailable()) await stopLock();
   return sec;
 }

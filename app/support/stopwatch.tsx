@@ -1,4 +1,5 @@
 // 공부 타이머 (열품타 스타일): 과목별 스톱워치, 오늘 총 공부 시간, 휴식 시간
+import { AmbientPanel } from '../../src/features/extra/AmbientPanel';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { AppState, Platform, Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -276,6 +277,7 @@ export default function Stopwatch() {
           onChange={(v) => updateSettings({ lockApps: { ...settings.lockApps, withTimer: v } })}
         />
       </Card>
+      <AmbientPanel compact style={{ marginTop: 12 }} />
     </Screen>
   );
 }
