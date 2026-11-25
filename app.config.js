@@ -9,10 +9,19 @@ const nativeOnly = new Set([
 
 module.exports = ({ config }) => {
   const isWeb = process.env.STUDY_WEB_BUILD === '1';
+  const isAndroid = process.env.STUDY_ANDROID_BUILD === '1';
   const webSettings = readWebConfig();
+  const name = (plugin) => (Array.isArray(plugin) ? plugin[0] : plugin);
+  // 안드로이드 APK 빌드: iOS 전용 스크린 타임 플러그인은 빼요
+  const iosOnly = new Set(['react-native-device-activity']);
+  const plugins = isWeb
+    ? (config.plugins || []).filter((p) => !nativeOnly.has(name(p)))
+    : isAndroid
+      ? (config.plugins || []).filter((p) => !iosOnly.has(name(p)))
+      : config.plugins;
   return {
     ...config,
-    plugins: isWeb ? (config.plugins || []).filter(plugin => !nativeOnly.has(Array.isArray(plugin) ? plugin[0] : plugin)) : config.plugins,
+    plugins,
     experiments: { ...(config.experiments || {}), baseUrl: getBaseUrl() },
     extra: { ...(config.extra || {}), ...webSettings, githubPagesBase: getBaseUrl() },
     web: { ...config.web, bundler: 'metro', output: 'single' },

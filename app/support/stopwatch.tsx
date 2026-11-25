@@ -1,12 +1,13 @@
 // 공부 타이머 (열품타 스타일): 과목별 스톱워치, 오늘 총 공부 시간, 휴식 시간
 import React, { useEffect, useMemo, useRef } from 'react';
-import { AppState, Pressable, Text, View } from 'react-native';
+import { AppState, Platform, Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/theme';
 import { getState, updateSettings, useData, useList } from '../../src/lib/store';
 import { Btn, Card, Dot, IconBtn, ProgressBar, Row, Screen, SectionTitle, T, ToggleRow, confirmAsk, promptText, showActions, toast } from '../../src/components/ui';
-import { elapsedSec, getRunning, pauseTimer, resumeTimer, useRunningTimer, useTick } from '../../src/features/support/timerStore';
+import { awayStats, elapsedSec, getRunning, pauseTimer, resumeTimer, useRunningTimer, useTick } from '../../src/features/support/timerStore';
+import { keyOf, useScreenHotkeys } from '../../src/lib/hotkeys';
 import { beginStudy, endStudy } from '../../src/features/support/session';
 import { pickActiveSeason } from '../../src/features/planner/logic';
 import { setTaskDone } from '../../src/features/planner/actions';
@@ -70,8 +71,9 @@ export default function Stopwatch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 앱을 나가면 일시정지 (설정)
+  // 앱을 나가면 일시정지 (설정) — 웹은 전역 집중 기록(focusGuard)이 대신 처리
   useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
     const sub = AppState.addEventListener('change', (st: string) => {
       const r = getRunning();
       if (st !== 'active' && r?.segStart && getState().settings.pauseOnLeave) {
@@ -90,6 +92,10 @@ export default function Stopwatch() {
   if (running) bySubject[running.subject] = (bySubject[running.subject] || 0) + runSec;
   const totalSec = todaySessions.reduce((a, s) => a + s.sec, 0) + runSec;
   const restSec = todaySessions.reduce((a, s) => a + (s.restSec || 0), 0) + (running?.restSec || 0);
+  const runAway = awayStats(running);
+  const awayCount = todaySessions.reduce((a, s) => a + (s.awayCount || 0), 0) + runAway.count;
+  const awaySec = todaySessions.reduce((a, s) => a + (s.awaySec || 0), 0) + runAway.sec;
+  const isWeb = Platform.OS === 'web';
 
   const stop = async () => {
     const r = getRunning();
@@ -124,6 +130,27 @@ export default function Stopwatch() {
     );
   };
 
+  useScreenHotkeys((e) => {
+    const k = keyOf(e);
+    const r = getRunning();
+    if (/^[1-9]$/.test(k)) {
+      const sub = subjects[Number(k) - 1];
+      if (!sub) return;
+      toggle(sub.name, sub.color);
+      return true;
+    }
+    if (k === ' ' && r) {
+      r.segStart ? pauseTimer() : resumeTimer();
+      return true;
+    }
+    if (k === 'e' && r) {
+      confirmAsk(`'${r.subject}' 공부를 끝내고 기록할까요?`, undefined, { okText: '끝내기' }).then((ok) => {
+        if (ok) stop();
+      });
+      return true;
+    }
+  });
+
   return (
     <Screen title="공부 타이머" accent={t.section.support} right={<IconBtn name="bar-chart-outline" onPress={() => router.push('/support/report')} />}>
       <Card style={{ alignItems: 'center', paddingVertical: 22 }} color={t.dark ? '#0F2A27' : '#E6F7F4'}>
@@ -137,6 +164,11 @@ export default function Stopwatch() {
         <T size={12} sub style={{ marginTop: 6 }}>
           목표 {fmtShortDur(settings.dailyGoalMin * 60)} · 휴식 {fmtShortDur(restSec)}
         </T>
+        {isWeb && settings.trackAway !== false && (
+          <T size={12} color={awayCount ? t.danger : t.success} weight="700" style={{ marginTop: 4 }}>
+            {awayCount ? `오늘 이탈 ${awayCount}회 · ${fmtShortDur(awaySec)}` : '오늘 이탈 0회 👍'}
+          </T>
+        )}
       </Card>
 
       {running && (
@@ -151,16 +183,26 @@ export default function Stopwatch() {
               {running.segStart ? '● 공부 중' : '❚❚ 휴식 중'}
             </T>
           </Row>
+          {isWeb && runAway.count > 0 && (
+            <T size={12} color={t.danger} style={{ marginTop: 4 }}>
+              이번 공부 이탈 {runAway.count}회 · {fmtShortDur(runAway.sec)}
+            </T>
+          )}
           <Text style={{ fontSize: 40, fontWeight: '900', color: running.color, fontVariant: ['tabular-nums'], marginVertical: 8 }}>{fmtClock(runSec)}</Text>
           <Row>
             <Btn title={running.segStart ? '휴식' : '계속'} icon={running.segStart ? 'pause' : 'play'} flex variant="secondary" color={running.color} onPress={() => (running.segStart ? pauseTimer() : resumeTimer())} />
             <Btn title="끝내기" icon="stop" flex color={t.danger} onPress={stop} />
-            <Btn title="" icon="expand" variant="secondary" onPress={() => router.push('/support/focus')} />
+            <Btn title={isWeb ? '집중 모드' : ''} icon="expand" variant="secondary" onPress={() => router.push('/support/focus')} />
           </Row>
         </Card>
       )}
 
       <SectionTitle title="과목" right={<Btn small variant="ghost" icon="add" title="과목 추가" onPress={addSubject} />} />
+      {isWeb && subjects.length > 0 && (
+        <T size={11} faint style={{ marginBottom: 6 }}>
+          키보드: 1–9 과목 시작 · Space 휴식/계속 · E 끝내기 · F 집중 모드 · ? 전체 단축키
+        </T>
+      )}
       {subjects.length === 0 && (
         <T sub size={13} style={{ marginBottom: 8 }}>
           계획 부문에서 시즌 과목을 만들거나, ‘과목 추가’로 타이머 전용 과목을 만들어요.
@@ -205,10 +247,31 @@ export default function Stopwatch() {
 
       <SectionTitle title="집중 설정" />
       <Card>
-        <ToggleRow label="앱을 나가면 자동 일시정지" desc="다른 앱을 쓰는 시간은 공부 시간에서 빠져요" value={settings.pauseOnLeave} onChange={(v) => updateSettings({ pauseOnLeave: v })} />
+        <ToggleRow
+          label={isWeb ? '탭·창을 벗어나면 자동 일시정지' : '앱을 나가면 자동 일시정지'}
+          desc={isWeb ? '다른 탭이나 프로그램을 쓰는 시간은 공부 시간에서 빠져요' : '다른 앱을 쓰는 시간은 공부 시간에서 빠져요'}
+          value={settings.pauseOnLeave}
+          onChange={(v) => updateSettings({ pauseOnLeave: v })}
+        />
+        {isWeb && (
+          <ToggleRow
+            label="이탈 기록"
+            desc="공부 중 다른 탭·창으로 간 횟수와 시간을 남겨 리포트에 보여줘요 (브라우저는 다른 앱을 막을 수 없어서 대신 기록해요)"
+            value={settings.trackAway !== false}
+            onChange={(v) => updateSettings({ trackAway: v })}
+          />
+        )}
+        {isWeb && (
+          <ToggleRow
+            label="집중 모드는 전체 화면으로"
+            desc="집중 화면을 열면 브라우저를 전체 화면으로 바꿔요"
+            value={settings.focusFullscreen !== false}
+            onChange={(v) => updateSettings({ focusFullscreen: v })}
+          />
+        )}
         <ToggleRow
           label="타이머를 켜면 앱 잠금"
-          desc={lockAvailable() ? '공부 도구 › 앱 잠금에서 고른 앱을 공부하는 동안 막아요' : '개발 빌드에서만 쓸 수 있어요'}
+          desc={lockAvailable() ? '공부 도구 › 앱 잠금에서 고른 앱을 공부하는 동안 막아요' : isWeb ? '휴대폰 앱에서만 돼요. 웹에서는 위의 이탈 기록과 집중 모드를 쓰세요' : '개발 빌드에서만 쓸 수 있어요'}
           value={settings.lockApps.withTimer}
           onChange={(v) => updateSettings({ lockApps: { ...settings.lockApps, withTimer: v } })}
         />

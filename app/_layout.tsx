@@ -6,9 +6,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initAuth, signInWithGoogle, useAuth } from '../src/lib/auth';
+import { initAuth, signInWithGoogle, startLocalMode, useAuth } from '../src/lib/auth';
 import { getState, useData } from '../src/lib/store';
-import { Btn, OverlayHost, T } from '../src/components/ui';
+import { Btn, OverlayHost, T, toast } from '../src/components/ui';
 import { useTheme } from '../src/theme';
 import { FAILURE_SNOOZE_KEY, overdueTasks } from '../src/features/planner/logic';
 import { rescheduleReminders } from '../src/lib/notify';
@@ -16,6 +16,10 @@ import { retryPendingUploads } from '../src/lib/files';
 import { releaseExpiredLock } from '../src/lib/applock';
 import { fmtTime } from '../src/lib/date';
 import { getWebConfigError } from '../src/lib/webConfig';
+import { closeHotkeyHelp, keyOf, openHotkeyHelp, useGlobalHotkeys, useHelp } from '../src/lib/hotkeys';
+import { HotkeyHelp } from '../src/components/HotkeyHelp';
+import { useFocusGuard } from '../src/features/support/focusGuard';
+import { getRunning, pauseTimer, resumeTimer } from '../src/features/support/timerStore';
 
 export default function RootLayout() {
   const t = useTheme();
@@ -40,6 +44,7 @@ export default function RootLayout() {
           <Stack.Screen name="support/focus" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
         </Stack>
         {user && ready && <AppEffects />}
+        {user && ready && <HotkeyHelp />}
         {(initializing || !user || !ready) && (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
             {initializing || (user && !ready) ? <Splash text={user ? '데이터를 불러오는 중…' : undefined} /> : <Login />}
@@ -130,6 +135,15 @@ function Login() {
           }
         }}
       />}
+      {Platform.OS === 'android' && (
+        <Btn
+          title="로그인 없이 이 기기에서 시작"
+          icon="phone-portrait-outline"
+          variant="secondary"
+          style={{ marginTop: 10 }}
+          onPress={() => startLocalMode().catch((e: any) => setErr(e?.message || '시작하지 못했어요'))}
+        />
+      )}
       {err ? (
         <T size={13} color={t.danger} style={{ marginTop: 12, textAlign: 'center' }}>
           {err}
@@ -146,6 +160,44 @@ function Login() {
 /** 앱이 켜질 때마다: 실패 화면 확인, 알림 재예약, 밀린 업로드 재시도 */
 function AppEffects() {
   const lastCheck = useRef(0);
+
+  // 웹: 공부 중 탭·창 이탈 기록
+  useFocusGuard();
+
+  // 웹: 어디서나 쓰는 단축키
+  useGlobalHotkeys((e) => {
+    const k = keyOf(e);
+    if (k === '?') {
+      if (useHelp.getState().open) closeHotkeyHelp();
+      else openHotkeyHelp();
+      return true;
+    }
+    if (useHelp.getState().open) return;
+    if (k === 's') {
+      router.navigate('/support/stopwatch');
+      return true;
+    }
+    if (k === 'c') {
+      router.navigate('/planner/calendar');
+      return true;
+    }
+    const r = getRunning();
+    if (!r) return;
+    if (k === 'f') {
+      router.navigate('/support/focus');
+      return true;
+    }
+    if (k === 'p') {
+      if (r.segStart) {
+        pauseTimer();
+        toast(`${r.subject} 휴식`);
+      } else {
+        resumeTimer();
+        toast(`${r.subject} 다시 시작`);
+      }
+      return true;
+    }
+  });
 
   useEffect(() => {
     const run = async () => {

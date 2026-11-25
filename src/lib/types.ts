@@ -207,6 +207,10 @@ export interface StudySession extends Base {
   restSec?: number;
   source: 'stopwatch' | 'starter' | 'timer';
   taskId?: string | null;
+  /** 공부 중 탭·창을 벗어난 횟수 (웹 집중 기록) */
+  awayCount?: number;
+  /** 벗어나 있던 시간(초) */
+  awaySec?: number;
 }
 
 export interface QuickLink extends Base {
@@ -214,6 +218,32 @@ export interface QuickLink extends Base {
   url: string;
   emoji: string;
   order: number;
+}
+
+/* ───────── 일반 일정 (교시·종례·학원 등 공부가 아닌 고정 일정) ───────── */
+
+export interface Schedule extends Base {
+  title: string;
+  color: string;
+  /** 하루 중 분 (예: 8시 40분 = 520) */
+  startMin: number;
+  endMin: number;
+  /** once = 그 날 한 번, weekly = 매주 고른 요일마다 */
+  repeat: 'once' | 'weekly';
+  /** once 일 때 날짜 */
+  date?: string | null;
+  /** weekly 일 때 요일 (0=일 … 6=토) */
+  days?: number[];
+  /** weekly 적용 기간 (없으면 제한 없음) */
+  from?: string | null;
+  to?: string | null;
+  /** 이 날짜들은 건너뜀 (휴일·시험 기간 등) */
+  skip?: string[];
+  /** 같이 만들어진 묶음 (예: 학교 시간표) — 한꺼번에 지우기용 */
+  group?: string | null;
+  /** 자동 배치·빈 시간 찾기에서 이 시간을 피함 (기본 true) */
+  busy?: boolean;
+  note?: string;
 }
 
 /* ───────── 설정 ───────── */
@@ -241,6 +271,12 @@ export interface Settings {
   penOnly: boolean;
   timerSubjects: { name: string; color: string }[];
   lockApps: { strict: boolean; withTimer: boolean; androidPackages: string[] };
+  /** 웹: 공부 중 탭·창 이탈을 기록 */
+  trackAway?: boolean;
+  /** 웹: 집중 화면을 열면 전체 화면으로 */
+  focusFullscreen?: boolean;
+  /** 웹: 키보드 단축키 사용 */
+  hotkeys?: boolean;
   /** 구글 드라이브의 '학습지원' 폴더 id */
   driveFolderId?: string | null;
 }
@@ -266,6 +302,9 @@ export const DEFAULT_SETTINGS: Settings = {
   penOnly: true,
   timerSubjects: [],
   lockApps: { strict: false, withTimer: false, androidPackages: [] },
+  trackAway: true,
+  focusFullscreen: true,
+  hotkeys: true,
 };
 
 export const TASK_KIND_LABEL: Record<TaskKind, string> = {

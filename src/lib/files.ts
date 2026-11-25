@@ -1,6 +1,6 @@
 // 파일 저장: 기기 로컬(documentDirectory/study) + 내 구글 드라이브('학습지원' 폴더)
 import * as FS from 'expo-file-system/legacy';
-import { getState, update } from './store';
+import { getState, isLocal, update } from './store';
 import { driveDownload, driveRename, driveTrash, driveUpload } from './drive';
 
 const ROOT = (FS.documentDirectory || '') + 'study/';
@@ -43,6 +43,7 @@ const MIME: Record<string, string> = { pdf: 'application/pdf', html: 'text/html'
 
 /** 드라이브에 올리고 드라이브 파일 id 반환 */
 export function uploadFile(localUri: string, name: string, ext: string): Promise<string> {
+  if (isLocal()) return Promise.reject(new Error('기기 전용 모드에서는 드라이브에 올리지 않아요'));
   const fileName = name.toLowerCase().endsWith('.' + ext) ? name : `${name}.${ext}`;
   return driveUpload(localUri, fileName, MIME[ext] || 'application/octet-stream');
 }
@@ -80,7 +81,7 @@ export async function renameRemote(driveId: string | null | undefined, name: str
 /** 오프라인에서 추가해 아직 못 올린 파일을 다시 올리기 */
 let retrying = false;
 export async function retryPendingUploads() {
-  if (retrying) return;
+  if (retrying || isLocal()) return;
   retrying = true;
   try {
     const s = getState();

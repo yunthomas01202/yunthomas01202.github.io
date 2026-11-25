@@ -45,6 +45,15 @@ export interface CalAllDay {
   color: string;
 }
 
+/** 공부 블록 뒤에 깔리는 일반 일정 (교시·종례 등). 끌어 옮길 수 없음 */
+export interface CalBg {
+  key: string;
+  start: number;
+  end: number;
+  title: string;
+  color: string;
+}
+
 export interface CalendarBoardProps {
   mode: CalMode;
   onMode: (m: CalMode) => void;
@@ -66,6 +75,8 @@ export interface CalendarBoardProps {
   onPressDay?: (day: string) => void;
   onPressAllDay?: (id: string) => void;
   onPressSlot?: (start: number, day: string) => void;
+  backgrounds?: CalBg[];
+  onPressBackground?: (key: string, start: number, day: string) => void;
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
   banner?: ReactNode;
@@ -248,6 +259,12 @@ function TimeGrid(props: CalendarBoardProps & { days: Date[]; ppm: number }) {
     return m;
   }, [blocks]);
 
+  const bgByDay = useMemo(() => {
+    const m: Record<string, CalBg[]> = {};
+    for (const b of props.backgrounds || []) (m[ymd(b.start)] ||= []).push(b);
+    return m;
+  }, [props.backgrounds]);
+
   const allDayByDay = useMemo(() => {
     const m: Record<string, CalAllDay[]> = {};
     for (const a of props.allDay || []) (m[a.date] ||= []).push(a);
@@ -375,6 +392,40 @@ function TimeGrid(props: CalendarBoardProps & { days: Date[]; ppm: number }) {
                       }}
                     />
                   ))}
+                  {(bgByDay[k] || []).map((g) => {
+                    const s = Math.max(startMin, minutesOfDay(g.start));
+                    const eMin = Math.min(endMin, ymd(g.end) !== k ? 24 * 60 : minutesOfDay(g.end));
+                    if (eMin <= s) return null;
+                    const top = (s - startMin) * ppm;
+                    const height = Math.max(10, (eMin - s) * ppm - 1);
+                    return (
+                      <Pressable
+                        key={g.key}
+                        onPress={() => props.onPressBackground?.(g.key, g.start, k)}
+                        style={{
+                          position: 'absolute',
+                          top,
+                          height,
+                          left: 1,
+                          right: 1,
+                          borderRadius: 4,
+                          backgroundColor: alpha(g.color, 0.14),
+                          borderLeftWidth: 3,
+                          borderLeftColor: alpha(g.color, 0.7),
+                          paddingHorizontal: 4,
+                          paddingTop: 1,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {height >= 12 && (
+                          <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', color: t.textSub }}>
+                            {g.title}
+                            {height >= 26 || days.length === 1 ? ` ${fmtTime(g.start)}` : ''}
+                          </Text>
+                        )}
+                      </Pressable>
+                    );
+                  })}
                   {list.map((b) => {
                     const end = resizing?.id === b.id ? resizing.end : b.end;
                     const s = Math.max(startMin, minutesOfDay(b.start));

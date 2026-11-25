@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useMemo } from 'react';
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getFirestore,
   collection,
@@ -32,6 +33,7 @@ import type {
   PerfItem,
   QuickLink,
   RecallLog,
+  Schedule,
   Season,
   Settings,
   StudyApp,
@@ -58,6 +60,7 @@ export const COLLECTIONS = [
   'sessions',
   'links',
   'recallLogs',
+  'schedules',
 ] as const;
 
 export type CollName = (typeof COLLECTIONS)[number];
@@ -78,6 +81,7 @@ export interface CollTypes {
   sessions: StudySession;
   links: QuickLink;
   recallLogs: RecallLog;
+  schedules: Schedule;
 }
 
 type Maps = { [K in CollName]: Record<ID, CollTypes[K]> };
@@ -97,6 +101,38 @@ export const useData = create<DataState>(() => ({
   ...emptyMaps(),
 }));
 
+/* ───────── 이 기기에만 저장 (로그인 없이) ───────── */
+
+export const LOCAL_UID = 'local';
+const LOCAL_KEY = 'local-data-v1';
+export const isLocal = () => useData.getState().uid === LOCAL_UID;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+function persistLocal() {
+  if (!isLocal()) return;
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    const s: any = useData.getState();
+    const out: any = { settings: s.settings };
+    for (const c of COLLECTIONS) out[c] = s[c];
+    AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(out)).catch(warn);
+  }, 300);
+}
+useData.subscribe(() => persistLocal());
+
+async function startLocal() {
+  useData.setState({ uid: LOCAL_UID, ready: false, settings: DEFAULT_SETTINGS, ...emptyMaps() });
+  try {
+    const raw = await AsyncStorage.getItem(LOCAL_KEY);
+    const v = raw ? JSON.parse(raw) : {};
+    const patch: any = { settings: { ...DEFAULT_SETTINGS, ...(v.settings || {}) } };
+    for (const c of COLLECTIONS) patch[c] = v[c] || {};
+    useData.setState(patch);
+  } catch (e) {
+    warn(e);
+  }
+  useData.setState({ ready: true });
+}
+
 /* ───────── 구독 ───────── */
 
 let unsubs: (() => void)[] = [];
@@ -114,6 +150,10 @@ export function stopSync() {
 
 export function startSync(uid: string) {
   stopSync();
+  if (uid === LOCAL_UID) {
+    startLocal();
+    return;
+  }
   useData.setState({ uid, ready: false, settings: DEFAULT_SETTINGS, ...emptyMaps() });
   const db = getFirestore();
   const loaded = new Set<string>();
@@ -198,7 +238,7 @@ export function add<K extends CollName>(c: K, data: NewDoc<K>): string {
   const id = data.id || newId();
   const obj = clean({ ...data, id, createdAt: data.createdAt ?? Date.now() }) as CollTypes[K];
   useData.setState((s) => ({ [c]: { ...s[c], [id]: obj } }) as any);
-  setDoc(ref(c, id), obj).catch(warn);
+  if (!isLocal()) setDoc(ref(c, id), obj).catch(warn);
   return id;
 }
 
@@ -209,7 +249,7 @@ export function update<K extends CollName>(c: K, id: ID, patch: Partial<CollType
     if (!cur) return {} as any;
     return { [c]: { ...s[c], [id]: { ...cur, ...p } } } as any;
   });
-  updateDoc(ref(c, id), p).catch(warn);
+  if (!isLocal()) updateDoc(ref(c, id), p).catch(warn);
 }
 
 export function remove<K extends CollName>(c: K, id: ID) {
@@ -218,7 +258,7 @@ export function remove<K extends CollName>(c: K, id: ID) {
     delete next[id];
     return { [c]: next } as any;
   });
-  deleteDoc(ref(c, id)).catch(warn);
+  if (!isLocal()) deleteDoc(ref(c, id)).catch(warn);
 }
 
 export type BatchOp =
@@ -228,7 +268,6 @@ export type BatchOp =
 
 /** 여러 문서를 한 번에 (최대 450개씩 끊어서) */
 export function batch(ops: BatchOp[]): string[] {
-  const db = getFirestore();
   const ids: string[] = [];
   const now = Date.now();
   // 낙관적 반영
@@ -251,6 +290,8 @@ export function batch(ops: BatchOp[]): string[] {
     }
     return next;
   });
+  if (isLocal()) return ids;
+  const db = getFirestore();
   for (let i = 0; i < ops.length; i += 450) {
     const b = writeBatch(db);
     for (const o of ops.slice(i, i + 450)) {
@@ -267,13 +308,24 @@ export function updateSettings(patch: Partial<Settings>) {
   const uid = uidOrThrow();
   const next = { ...useData.getState().settings, ...patch };
   useData.setState({ settings: next });
+  if (isLocal()) return;
   setDoc(doc(getFirestore(), 'users', uid), { settings: clean(next) }, { merge: true }).catch(warn);
 }
 
 /* ───────── 필기(잉크) 데이터: users/{uid}/ink/{fileId}__{pageKey} ───────── */
 
+const localGet = async (k: string) => {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(k)) || 'null');
+  } catch {
+    return null;
+  }
+};
+const localSet = (k: string, v: any) => AsyncStorage.setItem(k, JSON.stringify(v)).catch(warn);
+
 export async function loadInk(fileId: string): Promise<Record<string, string>> {
   const uid = uidOrThrow();
+  if (isLocal()) return (await localGet('ink:' + fileId)) || {};
   const snap: any = await getDocs(query(collection(getFirestore(), 'users', uid, 'ink'), where('fileId', '==', fileId)));
   const out: Record<string, string> = {};
   snap.docs.forEach((d: any) => {
@@ -285,6 +337,10 @@ export async function loadInk(fileId: string): Promise<Record<string, string>> {
 
 export function saveInk(fileId: string, key: string, data: string) {
   const uid = uidOrThrow();
+  if (isLocal()) {
+    localGet('ink:' + fileId).then((m) => localSet('ink:' + fileId, { ...(m || {}), [key]: data }));
+    return;
+  }
   setDoc(doc(getFirestore(), 'users', uid, 'ink', `${fileId}__${key}`), {
     fileId,
     key,
@@ -295,6 +351,7 @@ export function saveInk(fileId: string, key: string, data: string) {
 
 export async function deleteInk(fileId: string) {
   const uid = uidOrThrow();
+  if (isLocal()) return void AsyncStorage.removeItem('ink:' + fileId);
   const db = getFirestore();
   const snap: any = await getDocs(query(collection(db, 'users', uid, 'ink'), where('fileId', '==', fileId)));
   const b = writeBatch(db);
@@ -306,6 +363,10 @@ export async function deleteInk(fileId: string) {
 
 export async function loadAppData(appId: string): Promise<{ kv: Record<string, string>; ls: Record<string, string> }> {
   const uid = uidOrThrow();
+  if (isLocal()) {
+    const v = (await localGet('appData:' + appId)) || {};
+    return { kv: v.kv || {}, ls: v.ls || {} };
+  }
   const snap: any = await getDoc(doc(getFirestore(), 'users', uid, 'appData', appId));
   const v = snap?.data?.() || {};
   return { kv: v.kv || {}, ls: v.ls || {} };
@@ -313,6 +374,7 @@ export async function loadAppData(appId: string): Promise<{ kv: Record<string, s
 
 export function saveAppData(appId: string, data: { kv: Record<string, string>; ls: Record<string, string> }) {
   const uid = uidOrThrow();
+  if (isLocal()) return void localSet('appData:' + appId, data);
   setDoc(doc(getFirestore(), 'users', uid, 'appData', appId), { ...data, updatedAt: Date.now() }).catch(warn);
 }
 

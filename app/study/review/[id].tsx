@@ -1,6 +1,6 @@
 // 플래시카드 복습 (간격 반복)
 import React, { useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, View } from 'react-native';
+import { Animated, Image, Platform, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../src/theme';
 import { getState, update } from '../../../src/lib/store';
@@ -8,6 +8,7 @@ import { GRADE_LABEL, Grade, nextLabel, review } from '../../../src/lib/srs';
 import { Btn, Empty, ProgressBar, Row, Screen, T, haptic } from '../../../src/components/ui';
 import { Ring } from '../../../src/components/charts';
 import type { Card } from '../../../src/lib/types';
+import { keyOf, useScreenHotkeys } from '../../../src/lib/hotkeys';
 
 export default function Review() {
   const t = useTheme();
@@ -47,6 +48,24 @@ export default function Review() {
     flip.setValue(0);
     setIdx(idx + 1);
   };
+
+  useScreenHotkeys((e) => {
+    const k = keyOf(e);
+    if (k === 'Escape') {
+      router.canGoBack() ? router.back() : router.replace('/study');
+      return true;
+    }
+    if (!card) return;
+    if (!shown && (k === ' ' || k === 'Enter')) {
+      show();
+      return true;
+    }
+    if (shown && /^[1-4]$/.test(k)) {
+      grade((Number(k) - 1) as Grade);
+      return true;
+    }
+    if (shown && (k === ' ' || k === 'Enter')) return true; // 뒤집힌 뒤 Space 는 무시 (실수 채점 방지)
+  });
 
   if (total === 0) {
     return (
@@ -145,6 +164,11 @@ export default function Review() {
         </Row>
       ) : (
         <Btn title="정답 보기" onPress={show} />
+      )}
+      {Platform.OS === 'web' && (
+        <T size={11} faint center style={{ marginTop: 8 }}>
+          {shown ? '1 다시 · 2 어려움 · 3 좋음 · 4 쉬움' : 'Space 또는 Enter로 뒤집기'}
+        </T>
       )}
     </Screen>
   );

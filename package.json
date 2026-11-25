@@ -52,7 +52,8 @@
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
     "react-native-webview": "13.15.0",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.8",
+    "expo-font": "~14.0.12"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
@@ -62,5 +63,8 @@
   },
   "engines": {
     "node": ">=22.13.0"
+  },
+  "overrides": {
+    "expo-font": "~14.0.12"
   }
 }

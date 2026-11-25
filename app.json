@@ -3,12 +3,12 @@
     "name": "학습지원",
     "slug": "ultimate-study",
     "scheme": "ultimatestudy",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.yourname.ultimatestudy",
+      "bundleIdentifier": "com.thiomasas.ultimatestudy",
       "supportsTablet": true,
       "requireFullScreen": false,
       "googleServicesFile": "./GoogleService-Info.plist",
@@ -18,14 +18,27 @@
       }
     },
     "android": {
-      "package": "com.yourname.ultimatestudy",
+      "package": "com.thiomasas.ultimatestudy",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
-        "android.permission.WAKE_LOCK"
-      ]
+        "android.permission.WAKE_LOCK",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-icon-bg.png",
+        "backgroundColor": "#1F1760",
+        "monochromeImage": "./assets/adaptive-icon.png"
+      },
+      "versionCode": 2
     },
     "plugins": [
       "expo-router",
@@ -54,7 +67,7 @@
         "react-native-device-activity",
         {
           "appleTeamId": "YOUR_APPLE_TEAM_ID",
-          "appGroup": "group.com.yourname.ultimatestudy"
+          "appGroup": "group.com.thiomasas.ultimatestudy"
         }
       ]
     ],
@@ -62,14 +75,14 @@
       "typedRoutes": false
     },
     "extra": {
-      "googleWebClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+      "googleWebClientId": "627596102086-5cd89e8da8trtp1mg30s2njsebs9ckkg.apps.googleusercontent.com",
       "firebaseWeb": {
-        "apiKey": "YOUR_API_KEY",
-        "authDomain": "YOUR_PROJECT.firebaseapp.com",
-        "projectId": "YOUR_PROJECT",
-        "storageBucket": "YOUR_PROJECT.firebasestorage.app",
-        "messagingSenderId": "000000000000",
-        "appId": "1:000000000000:web:xxxxxxxx"
+        "apiKey": "AIzaSyAVNL0cq8_7GgUb2_VexbD6mvTXJ-qRwAw",
+        "authDomain": "ultimatestudy-16e2f.firebaseapp.com",
+        "projectId": "ultimatestudy-16e2f",
+        "storageBucket": "ultimatestudy-16e2f.firebasestorage.app",
+        "messagingSenderId": "627596102086",
+        "appId": "1:627596102086:web:e90dfb6ac466e235860ac7"
       }
     },
     "web": {
@@ -78,7 +91,9 @@
       "name": "학습지원",
       "shortName": "학습지원",
       "themeColor": "#4F46E5",
-      "backgroundColor": "#F4F5FA"
-    }
+      "backgroundColor": "#F4F5FA",
+      "favicon": "./assets/icon.png"
+    },
+    "icon": "./assets/icon.png"
   }
 }

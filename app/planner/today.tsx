@@ -12,6 +12,8 @@ import { pickActiveSeason, taskXP } from '../../src/features/planner/logic';
 import { addDays, fmtKDate, fmtTime, isToday, roundTo, ymd } from '../../src/lib/date';
 import { energyShade } from '../../src/lib/color';
 import type { Task } from '../../src/lib/types';
+import { SchedOcc, expandSchedules } from '../../src/features/planner/schedules';
+import { alpha } from '../../src/lib/color';
 
 export default function Today() {
   const t = useTheme();
@@ -31,6 +33,12 @@ export default function Today() {
     [tasks, day],
   );
   const shown = dayTasks.filter((x) => matchesPlace(x, place));
+  const schedList = useList('schedules');
+  const dayScheds = useMemo(() => expandSchedules(schedList, day, day), [schedList, day]);
+  const timeline: ({ k: 'task'; x: Task; at: number } | { k: 'sched'; o: SchedOcc; at: number })[] = [
+    ...shown.map((x) => ({ k: 'task' as const, x, at: x.start || 0 })),
+    ...(place ? [] : dayScheds.map((o) => ({ k: 'sched' as const, o, at: o.start }))),
+  ].sort((a, b) => a.at - b.at);
   const done = dayTasks.filter((x) => x.status === 'done');
   const xpToday = done.reduce((a, x) => a + taskXP(x), 0);
   const current = offset === 0 ? dayTasks.find((x) => x.status === 'todo' && x.start! <= now && x.end! > now) : undefined;
@@ -120,23 +128,48 @@ export default function Today() {
       )}
 
       <SectionTitle title={place ? `${placeName?.emoji} #${placeName?.name}에서 할 일` : '타임라인'} />
-      {shown.length === 0 ? (
+      {timeline.length === 0 ? (
         <Empty icon="calendar-clear-outline" title={place ? '이 장소 태그가 붙은 일정이 없어요' : '이 날 배치된 일정이 없어요'} />
       ) : (
-        shown.map((x) => (
-          <TaskRow
-            key={x.id}
-            task={x}
-            subject={subjects[x.subjectId]}
-            onToggle={() => setTaskDone(x, x.status !== 'done')}
-            onPress={() => setEdit(x)}
-            right={
-              x.status === 'todo' ? (
-                <IconBtn name="play-circle" size={26} color={t.primary} onPress={() => router.push(`/support/stopwatch?task=${x.id}`)} />
-              ) : undefined
-            }
-          />
-        ))
+        timeline.map((it) =>
+          it.k === 'sched' ? (
+            <View
+              key={it.o.key}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 7,
+                paddingHorizontal: 10,
+                marginBottom: 6,
+                borderRadius: 10,
+                backgroundColor: alpha(it.o.color, 0.1),
+                borderLeftWidth: 3,
+                borderLeftColor: alpha(it.o.color, 0.7),
+              }}
+            >
+              <T size={12} sub style={{ width: 92 }}>
+                {fmtTime(it.o.start)}–{fmtTime(it.o.end)}
+              </T>
+              <T size={13} weight="700" style={{ flex: 1 }} numberOfLines={1}>
+                {it.o.title}
+              </T>
+              {offset === 0 && it.o.start <= now && it.o.end > now && <Badge label="지금" color={it.o.color} />}
+            </View>
+          ) : (
+            <TaskRow
+              key={it.x.id}
+              task={it.x}
+              subject={subjects[it.x.subjectId]}
+              onToggle={() => setTaskDone(it.x, it.x.status !== 'done')}
+              onPress={() => setEdit(it.x)}
+              right={
+                it.x.status === 'todo' ? (
+                  <IconBtn name="play-circle" size={26} color={t.primary} onPress={() => router.push(`/support/stopwatch?task=${it.x.id}`)} />
+                ) : undefined
+              }
+            />
+          ),
+        )
       )}
 
       {place && (

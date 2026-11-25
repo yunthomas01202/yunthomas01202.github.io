@@ -687,7 +687,67 @@
     pushUndo({ type: 'clear', key: p.key, items: items });
     toast('페이지를 지웠어요 (실행 취소 가능)');
   }
-  document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } });
+  /* 키보드 단축키 (PC·키보드 연결 태블릿) — 한글 자판이어도 동작하도록 e.code 기준 */
+  function keyName(e) {
+    var c = e.code || '';
+    if (c.indexOf('Key') === 0) return c.slice(3).toLowerCase();
+    if (c.indexOf('Digit') === 0) return c.slice(5);
+    if (c === 'BracketLeft') return '[';
+    if (c === 'BracketRight') return ']';
+    if (c === 'Equal' || c === 'NumpadAdd') return '+';
+    if (c === 'Minus' || c === 'NumpadSubtract') return '-';
+    return e.key;
+  }
+  document.addEventListener('keydown', function (e) {
+    var k = keyName(e);
+    if (e.ctrlKey || e.metaKey) {
+      if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if (k === 'y') { e.preventDefault(); redo(); }
+      else if (k === '+' ) { e.preventDefault(); setZoom(S.zoom * 1.2); }
+      else if (k === '-') { e.preventDefault(); setZoom(S.zoom / 1.2); }
+      else if (k === '0') { e.preventDefault(); setZoom(1); }
+      return;
+    }
+    if (e.altKey || e.isComposing) return;
+    var tg = e.target, tag = tg && tg.tagName ? tg.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (tg && tg.isContentEditable)) return;
+    if ($('#modal') && $('#modal').classList.contains('show')) return;
+    var hit = true;
+    switch (k) {
+      case 'v': setTool('hand'); break;
+      case 'p': setTool('pen'); break;
+      case 'h': setTool('hl'); break;
+      case 'e': setTool('eraser'); break;
+      case 't': if (S.mode === 'pdf') setTool(S.tool === 'select' ? S.prevTool : 'select'); else hit = false; break;
+      case 's': setTool(S.tool === 'spot' ? S.prevTool : 'spot'); if (!S.spot && S.tool === 'spot') toast('집중해서 볼 영역을 드래그하세요'); break;
+      case 'c': setTool(S.tool === 'capture' ? S.prevTool : 'capture'); if (S.tool === 'capture') toast('카드로 만들 영역을 드래그하세요'); break;
+      case 'ArrowUp': if (S.spot) moveSpot(-1); else hit = false; break;
+      case 'ArrowDown': if (S.spot) moveSpot(1); else hit = false; break;
+      case '[': case ']': {
+        var d = k === '[' ? -1 : 1;
+        if (S.tool === 'hl') S.hlW = clamp(S.hlW + d, 0, HL_W.length - 1);
+        else if (S.tool === 'pen') S.penW = clamp(S.penW + d, 0, PEN_W.length - 1);
+        else { hit = false; break; }
+        buildBars(); toast('굵기 ' + ((S.tool === 'hl' ? S.hlW : S.penW) + 1) + '단계'); break;
+      }
+      case '+': setZoom(S.zoom * 1.2); break;
+      case '-': setZoom(S.zoom / 1.2); break;
+      case '0': setZoom(1); break;
+      case 'Escape':
+        if (S.tool === 'select' || S.tool === 'spot' || S.tool === 'capture') setTool(S.prevTool || 'pen');
+        else if (S.spot) { S.spot = null; placeSpot(); updateSpotCtl(); buildBars(); }
+        else hit = false;
+        break;
+      default:
+        if (/^[1-6]$/.test(k) && (S.tool === 'pen' || S.tool === 'hl')) {
+          var cols = S.tool === 'hl' ? HL_COLORS : PEN_COLORS, c = cols[Number(k) - 1];
+          if (!c) { hit = false; break; }
+          if (S.tool === 'hl') S.hl = c; else S.color = c;
+          buildBars();
+        } else hit = false;
+    }
+    if (hit) e.preventDefault();
+  });
 
   /* ═════════════════ 포인터 입력 ═════════════════ */
   var ptrs = {};          // 화면에 닿은 손가락/펜

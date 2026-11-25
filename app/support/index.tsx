@@ -29,6 +29,7 @@ export default function SupportHub() {
     { title: '무음 타이머', desc: '소리 없이 화면으로만', icon: 'hourglass' as const, color: '#3E63DD', route: '/support/timer' },
     { title: '공부 리포트', desc: '일·주·월 그래프', icon: 'bar-chart' as const, color: '#8E4EC6', route: '/support/report' },
     { title: '앱 잠금', desc: '공부 중 다른 앱 막기', icon: 'lock-closed' as const, color: '#E5484D', route: '/support/lock' },
+    { title: '알람', desc: '벨 · 진동 · 내 음악', icon: 'alarm' as const, color: '#F5A524', route: '/support/alarm' },
     { title: '링크', desc: links.length ? `${links.length}개 바로가기` : '자주 가는 사이트', icon: 'link' as const, color: '#687076', route: '/support/links' },
   ];
   const cols = width >= 700 ? 3 : 2;

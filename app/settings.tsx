@@ -1,14 +1,21 @@
 // 설정: 계정, 장소 태그, 스탯 축, 캘린더, 알림, 테마, 데이터
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Image, Platform, Share, View } from 'react-native';
 import { useTheme } from '../src/theme';
 import { signOut, useAuth } from '../src/lib/auth';
-import { COLLECTIONS, getState, newId, updateSettings, useData } from '../src/lib/store';
+import { COLLECTIONS, LOCAL_UID, getState, newId, updateSettings, useData, useList } from '../src/lib/store';
+import { ScheduleEditor, ScheduleManager, SchoolBuilder } from '../src/features/planner/ScheduleSheets';
+import { describeRepeat, durLabel, groupsOf } from '../src/features/planner/schedules';
+import type { Schedule } from '../src/lib/types';
 import { Btn, Card, Chip, Field, IconBtn, Label, Row, Screen, SectionTitle, Segmented, Stepper, T, ToggleRow, confirmAsk, promptText, toast } from '../src/components/ui';
-import { fmtMin } from '../src/lib/date';
+import { fmtMin, ymd } from '../src/lib/date';
+import { openHotkeyHelp } from '../src/lib/hotkeys';
+import { router } from 'expo-router';
 import { connectDrive } from '../src/lib/files';
 import type { Settings } from '../src/lib/types';
 
+const FIXED_DRAFT = { date: ymd(), startMin: 16 * 60, endMin: 17 * 60, weekly: true };
 const PLACE_EMOJIS = ['🛏️', '🏫', '🏠', '☕', '📚', '🚌', '🏢', '🌳'];
 
 export default function SettingsScreen() {
@@ -17,6 +24,16 @@ export default function SettingsScreen() {
   const st = useData((s) => s.settings);
   const [axes, setAxes] = useState<string[]>(st.statAxes);
   const set = (p: Partial<Settings>) => updateSettings(p);
+  const isLocalUser = user?.uid === LOCAL_UID;
+  const schedules = useList('schedules');
+  const [mgr, setMgr] = useState(false);
+  const [school, setSchool] = useState(false);
+  const [edit, setEdit] = useState<{ open: boolean; schedule: Schedule | null }>({ open: false, schedule: null });
+  const fixedGroups = useMemo(() => groupsOf(schedules), [schedules]);
+  const fixedSingles = useMemo(
+    () => schedules.filter((x) => !x.group && x.repeat === 'weekly').sort((a, b) => a.startMin - b.startMin),
+    [schedules],
+  );
 
   return (
     <Screen title="설정">
@@ -34,9 +51,11 @@ export default function SettingsScreen() {
           <Btn
             small
             variant="secondary"
-            title="로그아웃"
+            title={isLocalUser ? '나가기' : '로그아웃'}
             onPress={async () => {
-              if (await confirmAsk('로그아웃할까요?', '데이터는 계정에 안전하게 남아 있어요.')) signOut();
+              if (isLocalUser) {
+                if (await confirmAsk('처음 화면으로 갈까요?', '이 기기 데이터는 지워지지 않고, 다시 "로그인 없이 시작"을 누르면 그대로 보여요.')) signOut();
+              } else if (await confirmAsk('로그아웃할까요?', '데이터는 계정에 안전하게 남아 있어요.')) signOut();
             }}
           />
         </Row>
@@ -154,6 +173,67 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      <SectionTitle title="기본 일정 (교시 · 조회 · 종례)" />
+      <Card>
+        <T size={12} sub style={{ marginBottom: 12, lineHeight: 18 }}>
+          공부할 일이 아니라 매주 똑같이 반복되는 고정 일정이에요. 캘린더에 회색 띠로 깔리고, 자동 배치는 이 시간을 피해요. 알람에서 "기본 일정에
+          맞추기"로 1교시 전·종례 뒤 알람도 바로 만들 수 있어요.
+        </T>
+        {fixedGroups.map((g) => {
+          const items = schedules.filter((x) => x.group === g.group).sort((a, b) => a.startMin - b.startMin);
+          const first = items[0];
+          const last = items[items.length - 1];
+          return (
+            <Row key={g.group} style={{ paddingVertical: 8 }}>
+              <Ionicons name="school" size={18} color={first?.color || t.textSub} />
+              <View style={{ flex: 1 }}>
+                <T weight="800">{g.title}</T>
+                <T size={12} sub>
+                  {g.count}개 · {first ? describeRepeat(first) : ''} · {first && last ? `${durLabel({ startMin: first.startMin, endMin: last.endMin })}` : ''}
+                </T>
+              </View>
+              <IconBtn name="list" size={18} onPress={() => setMgr(true)} />
+            </Row>
+          );
+        })}
+        {fixedSingles.slice(0, 8).map((x) => (
+          <Row key={x.id} style={{ paddingVertical: 6 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: x.color || t.textSub }} />
+            <T weight="700" style={{ flex: 1 }} numberOfLines={1}>
+              {x.title}
+            </T>
+            <T size={12} sub>
+              {describeRepeat(x)} {durLabel(x)}
+            </T>
+            <IconBtn name="pencil" size={16} onPress={() => setEdit({ open: true, schedule: x })} />
+          </Row>
+        ))}
+        {!fixedGroups.length && !fixedSingles.length && (
+          <T size={13} faint style={{ marginBottom: 6 }}>
+            아직 없어요. 학교 시간표를 만들면 조회·1~7교시·점심·종례가 한 번에 들어가요.
+          </T>
+        )}
+        <Row style={{ marginTop: 10 }}>
+          <Btn title="학교 시간표 만들기" icon="school-outline" flex small onPress={() => setSchool(true)} />
+          <Btn title="고정 일정 추가" icon="add" variant="secondary" flex small onPress={() => setEdit({ open: true, schedule: null })} />
+        </Row>
+        <Btn title="전체 관리 · 휴일 빼기" icon="calendar-clear-outline" variant="ghost" small style={{ marginTop: 6, alignSelf: 'flex-start' }} onPress={() => setMgr(true)} />
+      </Card>
+
+      <SectionTitle title="알람" />
+      <Card onPress={() => router.push('/support/alarm')}>
+        <Row>
+          <Ionicons name="alarm" size={22} color="#F5A524" />
+          <View style={{ flex: 1 }}>
+            <T weight="800">알람 설정</T>
+            <T size={12} sub>
+              벨 · 진동 · 벨+진동, 벨소리나 내 음악 고르기
+            </T>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={t.textFaint} />
+        </Row>
+      </Card>
+
       <SectionTitle title="알림 · 필기 · 화면" />
       <Card>
         <Row style={{ marginBottom: 6 }}>
@@ -163,6 +243,18 @@ export default function SettingsScreen() {
           <Stepper value={st.notifyBeforeMin} onChange={(v) => set({ notifyBeforeMin: v })} step={5} min={0} max={60} format={(v) => (v ? `${v}분 전` : '끔')} />
         </Row>
         <ToggleRow label="펜으로만 필기" desc="손가락은 스크롤·확대에만 써요 (애플펜슬·S펜 사용 시 추천)" value={st.penOnly} onChange={(v) => set({ penOnly: v })} />
+        {Platform.OS === 'web' && (
+          <>
+            <ToggleRow label="키보드 단축키" desc="? 키로 전체 목록을 볼 수 있어요" value={st.hotkeys !== false} onChange={(v) => set({ hotkeys: v })} />
+            <ToggleRow
+              label="공부 중 이탈 기록"
+              desc="타이머가 도는 동안 다른 탭·창으로 간 횟수와 시간을 리포트에 남겨요"
+              value={st.trackAway !== false}
+              onChange={(v) => set({ trackAway: v })}
+            />
+            <Btn title="단축키 목록 보기" icon="keypad-outline" variant="ghost" small onPress={openHotkeyHelp} style={{ alignSelf: 'flex-start', marginBottom: 6 }} />
+          </>
+        )}
         <Label>테마</Label>
         <Segmented
           value={st.theme}
@@ -178,7 +270,9 @@ export default function SettingsScreen() {
       <SectionTitle title="데이터" />
       <Card>
         <T size={12} sub style={{ marginBottom: 10 }}>
-          모든 데이터는 구글 계정에 연결된 클라우드(Firebase)에 저장되고, 인터넷이 없을 때도 기기에 저장해 뒀다가 연결되면 동기화돼요.
+          {isLocalUser
+            ? '로그인 없이 쓰는 중이라 모든 데이터는 이 기기에만 저장돼요. 앱을 지우면 함께 지워지니 가끔 내보내기로 백업해 두세요.'
+            : '모든 데이터는 구글 계정에 연결된 클라우드(Firebase)에 저장되고, 인터넷이 없을 때도 기기에 저장해 뒀다가 연결되면 동기화돼요.'}
         </T>
         {Platform.OS === 'web' && (
           <Btn
@@ -208,8 +302,26 @@ export default function SettingsScreen() {
         />
       </Card>
       <T size={11} faint center style={{ marginTop: 24 }}>
-        학습지원 v1.0
+        학습지원 v1.1
       </T>
+      <ScheduleEditor visible={edit.open} schedule={edit.schedule} draft={FIXED_DRAFT} onClose={() => setEdit({ open: false, schedule: null })} />
+      <ScheduleManager
+        visible={mgr}
+        onClose={() => setMgr(false)}
+        onAdd={() => {
+          setMgr(false);
+          setTimeout(() => setEdit({ open: true, schedule: null }), 300);
+        }}
+        onEdit={(x) => {
+          setMgr(false);
+          setTimeout(() => setEdit({ open: true, schedule: x }), 300);
+        }}
+        onSchool={() => {
+          setMgr(false);
+          setTimeout(() => setSchool(true), 300);
+        }}
+      />
+      <SchoolBuilder visible={school} onClose={() => setSchool(false)} />
     </Screen>
   );
 }

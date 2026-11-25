@@ -9,7 +9,8 @@ import {
   signOut as fbSignOut,
 } from '@react-native-firebase/auth';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
-import { startSync, stopSync } from './store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LOCAL_UID, startSync, stopSync } from './store';
 import { DRIVE_SCOPE } from './drive';
 
 export interface AppUser {
@@ -28,7 +29,39 @@ export const useAuth = create<AuthState>(() => ({ user: null, initializing: true
 
 let configured = false;
 
+const LOCAL_FLAG = 'local-mode-v1';
+const LOCAL_USER: AppUser = { uid: LOCAL_UID, name: '이 기기 사용자', email: '로그인 없이 이 기기에만 저장 중', photo: null };
+
+/** 로그인 없이 이 기기에만 저장하며 시작 */
+export async function startLocalMode() {
+  await AsyncStorage.setItem(LOCAL_FLAG, '1');
+  useAuth.setState({ user: LOCAL_USER, initializing: false });
+  startSync(LOCAL_UID);
+}
+
 export function initAuth() {
+  let unsub: (() => void) | null = null;
+  let cancelled = false;
+  AsyncStorage.getItem(LOCAL_FLAG)
+    .then((v) => {
+      if (cancelled) return;
+      if (v === '1') {
+        useAuth.setState({ user: LOCAL_USER, initializing: false });
+        startSync(LOCAL_UID);
+      } else {
+        unsub = initFirebaseAuth();
+      }
+    })
+    .catch(() => {
+      if (!cancelled) unsub = initFirebaseAuth();
+    });
+  return () => {
+    cancelled = true;
+    unsub?.();
+  };
+}
+
+function initFirebaseAuth() {
   if (!configured) {
     GoogleSignin.configure({
       // Firebase 콘솔 > Authentication > Google > 웹 SDK 구성의 "웹 클라이언트 ID"
@@ -38,7 +71,8 @@ export function initAuth() {
     });
     configured = true;
   }
-  return onAuthStateChanged(getAuth(), (u: any) => {
+  try {
+    return onAuthStateChanged(getAuth(), (u: any) => {
     if (u) {
       useAuth.setState({
         user: { uid: u.uid, name: u.displayName || '학생', email: u.email || '', photo: u.photoURL || null },
@@ -49,7 +83,12 @@ export function initAuth() {
       stopSync();
       useAuth.setState({ user: null, initializing: false });
     }
-  });
+    });
+  } catch (e) {
+    console.warn('[auth]', e);
+    useAuth.setState({ user: null, initializing: false });
+    return () => {};
+  }
 }
 
 export async function signInWithGoogle(): Promise<boolean> {
@@ -64,6 +103,12 @@ export async function signInWithGoogle(): Promise<boolean> {
 }
 
 export async function signOut() {
+  if (useAuth.getState().user?.uid === LOCAL_UID) {
+    await AsyncStorage.removeItem(LOCAL_FLAG);
+    stopSync();
+    useAuth.setState({ user: null, initializing: false });
+    return;
+  }
   try {
     await GoogleSignin.signOut();
   } catch {}

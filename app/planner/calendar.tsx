@@ -7,14 +7,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useTheme } from '../../src/theme';
 import { batch, getState, useData, useList } from '../../src/lib/store';
-import type { Task } from '../../src/lib/types';
+import type { Schedule, Task } from '../../src/lib/types';
+import { expandSchedules } from '../../src/features/planner/schedules';
+import { ScheduleDraft, ScheduleEditor, ScheduleManager, SchoolBuilder, openScheduleActions } from '../../src/features/planner/ScheduleSheets';
+import { keyOf, useScreenHotkeys } from '../../src/lib/hotkeys';
 import { energyShade, readableOn } from '../../src/lib/color';
-import { MIN, addDays, fmtKDate, fmtMin, fmtTime, parseYmd, ymd } from '../../src/lib/date';
+import { MIN, addDays, addMonths, fmtKDate, fmtMin, fmtTime, minutesOfDay, parseYmd, ymd } from '../../src/lib/date';
 import { Btn, Chip, Dot, IconBtn, Label, Row, Sheet, Stepper, T, toast } from '../../src/components/ui';
 import { CalendarBoard, CalBlock, CalMode, SidebarToggle, SplitLayout } from '../../src/components/calendar/CalendarBoard';
 import { DragProvider, Draggable, measureView, useDragActions } from '../../src/components/calendar/drag';
 import { PlaceTabs, TaskEditor, matchesPlace } from '../../src/features/planner/components';
 import { autoPlace, busyOf, dayStats, heatLevels, pickActiveSeason } from '../../src/features/planner/logic';
+import { scheduleBusy } from '../../src/features/planner/schedules';
 import {
   addStarterBefore,
   duplicateTask,
@@ -45,6 +49,10 @@ export default function PlannerCalendar() {
   const [blockSheet, setBlockSheet] = useState<string | null>(null);
   const [taskEdit, setTaskEdit] = useState<{ open: boolean; task: Task | null }>({ open: false, task: null });
   const [autoOpen, setAutoOpen] = useState(false);
+  const [schedEdit, setSchedEdit] = useState<{ open: boolean; schedule: Schedule | null; draft?: ScheduleDraft | null }>({ open: false, schedule: null });
+  const [schedMgr, setSchedMgr] = useState(false);
+  const [schoolOpen, setSchoolOpen] = useState(false);
+  const schedList = useList('schedules');
 
   const season = seasonId ? seasonsMap[seasonId] : undefined;
 
@@ -93,6 +101,42 @@ export default function PlannerCalendar() {
     [seasons, t],
   );
   const heat = useMemo(() => heatLevels(dayStats(tasks)), [tasks]);
+
+  // 일반 일정 (교시·종례 등): 보이는 범위 앞뒤로 넉넉히 펼침
+  const anchorKey = ymd(anchor);
+  const backgrounds = useMemo(
+    () =>
+      expandSchedules(schedList, ymd(addDays(anchor, -40)), ymd(addDays(anchor, 40))).map((o) => ({
+        key: o.key,
+        start: o.start,
+        end: o.end,
+        title: o.title,
+        color: o.color,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schedList, anchorKey],
+  );
+
+  const openSchedNew = (draft?: ScheduleDraft | null) => setSchedEdit({ open: true, schedule: null, draft: draft || { date: ymd(anchor), startMin: 16 * 60, endMin: 17 * 60 } });
+
+  const move = (dir: number) => {
+    if (mode === 'month') setAnchor(addMonths(anchor, dir));
+    else setAnchor(addDays(anchor, dir * (mode === 'week' ? 7 : 1)));
+  };
+
+  useScreenHotkeys((e) => {
+    const k = keyOf(e);
+    if (schedEdit.open || schedMgr || schoolOpen || autoOpen || taskEdit.open || blockSheet) return;
+    if (k === 'ArrowLeft') return move(-1), true;
+    if (k === 'ArrowRight') return move(1), true;
+    if (k === 't') return setAnchor(new Date()), true;
+    if (k === 'd') return setMode('day'), true;
+    if (k === 'w') return setMode('week'), true;
+    if (k === 'm') return setMode('month'), true;
+    if (k === 'n') return openSchedNew(), true;
+    if (k === 'l') return setDrawer((v) => !v), true;
+    if (k === 'Escape' && placing) return setPlacing(null), true;
+  });
   const unscheduledCount = useMemo(
     () => tasks.filter((x) => x.seasonId === seasonId && !x.start && x.status === 'todo').length,
     [tasks, seasonId],
@@ -145,11 +189,26 @@ export default function PlannerCalendar() {
               setAnchor(parseYmd(day));
               setMode('day');
             }}
-            onPressSlot={(start) => {
-              if (!placing) return;
+            onPressSlot={(start, day) => {
+              if (!placing) {
+                // 빈 칸을 탭하면 일반 일정 추가 (학원·동아리 등)
+                const sm = minutesOfDay(start);
+                openSchedNew({ date: day, startMin: sm, endMin: Math.min(24 * 60, sm + 60) });
+                return;
+              }
               scheduleTask(placing.id, start);
               toast(`${fmtTime(start)}에 '${placing.title}' 배치`);
               setPlacing(null);
+            }}
+            backgrounds={backgrounds}
+            onPressBackground={(key, start, day) => {
+              const sc = getState().schedules[key.split('@')[0]];
+              if (!sc) return;
+              if (placing) {
+                toast(`'${sc.title}' 시간이에요. 다른 칸을 골라주세요`);
+                return;
+              }
+              openScheduleActions(sc, day, (x) => setSchedEdit({ open: true, schedule: x }));
             }}
             headerLeft={
               <Row gap={0}>
@@ -157,6 +216,7 @@ export default function PlannerCalendar() {
                 <SidebarToggle onPress={() => setDrawer(true)} count={unscheduledCount} />
               </Row>
             }
+            headerRight={<IconBtn name="calendar-clear-outline" size={22} onPress={() => setSchedMgr(true)} />}
             banner={
               placing ? (
                 <View
@@ -200,6 +260,29 @@ export default function PlannerCalendar() {
         onClose={() => setTaskEdit({ open: false, task: null })}
       />
       <AutoPlaceSheet visible={autoOpen} onClose={() => setAutoOpen(false)} seasonId={seasonId} place={place} />
+      <ScheduleEditor
+        visible={schedEdit.open}
+        schedule={schedEdit.schedule}
+        draft={schedEdit.draft}
+        onClose={() => setSchedEdit({ open: false, schedule: null })}
+      />
+      <ScheduleManager
+        visible={schedMgr}
+        onClose={() => setSchedMgr(false)}
+        onAdd={() => {
+          setSchedMgr(false);
+          setTimeout(() => openSchedNew(), 300);
+        }}
+        onEdit={(x) => {
+          setSchedMgr(false);
+          setTimeout(() => setSchedEdit({ open: true, schedule: x }), 300);
+        }}
+        onSchool={() => {
+          setSchedMgr(false);
+          setTimeout(() => setSchoolOpen(true), 300);
+        }}
+      />
+      <SchoolBuilder visible={schoolOpen} onClose={() => setSchoolOpen(false)} />
     </View>
   );
 }
@@ -488,7 +571,7 @@ function AutoPlaceSheet({
     const from = ymd();
     let to = ymd(addDays(new Date(), days - 1));
     if (season && to > season.endDate) to = season.endDate;
-    const busy = busyOf(Object.values(getState().tasks).filter((x) => x.status !== 'failed'));
+    const busy = busyOf(Object.values(getState().tasks).filter((x) => x.status !== 'failed'), scheduleBusy(from, to));
     const res = autoPlace(candidates, from, to, busy, settings, limit);
     batch(res.map((r) => ({ op: 'update' as const, c: 'tasks' as const, id: r.id, data: { start: r.start, end: r.end } })));
     toast(res.length ? `${res.length}개를 배치했어요` : '빈 시간이 부족해요. 기간이나 하루 한도를 늘려보세요');

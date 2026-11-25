@@ -9,12 +9,13 @@ import { useTheme } from '../../src/theme';
 import { add, getState, remove, update, useData, useList } from '../../src/lib/store';
 import type { PerfBlock, PerfCategory, PerfEvent, PerfItem } from '../../src/lib/types';
 import { energyShade, readableOn } from '../../src/lib/color';
-import { MIN, atMinutes, daysUntil, ddayLabel, fmtKDate, fmtMin, fmtTime, parseYmd, ymd } from '../../src/lib/date';
+import { MIN, addDays, atMinutes, daysUntil, ddayLabel, fmtKDate, fmtMin, fmtTime, parseYmd, ymd } from '../../src/lib/date';
 import { Badge, Btn, Dot, IconBtn, Label, Row, Sheet, Stepper, T, haptic, toast } from '../../src/components/ui';
 import { CalendarBoard, CalBlock, CalMode, SidebarToggle, SplitLayout } from '../../src/components/calendar/CalendarBoard';
 import { DragProvider, Draggable, measureView, useDragActions } from '../../src/components/calendar/drag';
 import { CategoryEditor, EventEditor, ItemEditor, itemColor } from '../../src/features/perf/components';
 import { findFreeSlot } from '../../src/features/planner/logic';
+import { expandSchedules, scheduleBusy } from '../../src/features/planner/schedules';
 
 export default function PerfCalendar() {
   const t = useTheme();
@@ -29,6 +30,14 @@ export default function PerfCalendar() {
 
   const [mode, setMode] = useState<CalMode>(width >= 820 ? 'week' : 'month');
   const [anchor, setAnchor] = useState(new Date());
+  const schedList = useList('schedules');
+  const anchorKey = ymd(anchor);
+  const backgrounds = useMemo(
+    () =>
+      expandSchedules(schedList, ymd(addDays(anchor, -40)), ymd(addDays(anchor, 40))).map((o) => ({ key: o.key, start: o.start, end: o.end, title: o.title, color: o.color })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schedList, anchorKey],
+  );
   const [drawer, setDrawer] = useState(false);
   const [placing, setPlacing] = useState<PerfItem | null>(null);
   const [blockSheet, setBlockSheet] = useState<string | null>(null);
@@ -71,6 +80,7 @@ export default function PerfCalendar() {
     const busy = [
       ...Object.values(getState().perfBlocks).map((b) => [b.start, b.end] as [number, number]),
       ...Object.values(getState().tasks).filter((x) => x.start && x.end).map((x) => [x.start!, x.end!] as [number, number]),
+      ...scheduleBusy(day, day),
     ];
     const s = findFreeSlot(day, it.estMin, busy, settings, { preferFrom: 18 * 60, preferTo: 23 * 60 });
     if (s === null) return toast('그 날엔 빈 시간이 없어요');
@@ -147,6 +157,11 @@ export default function PerfCalendar() {
                 return;
               }
               setDaySheet(day);
+            }}
+            backgrounds={backgrounds}
+            onPressBackground={(key) => {
+              const sc = getState().schedules[key.split('@')[0]];
+              if (sc) toast(`${sc.title} · 일반 일정은 계획 › 캘린더 짜기에서 고칠 수 있어요`);
             }}
             onPressSlot={(start) => {
               if (!placing) return;

@@ -1,6 +1,6 @@
 // 공부 리포트: 일·주·월 공부 시간 그래프 (열품타 스타일)
 import React, { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { useTheme } from '../../src/theme';
 import { useData, useList } from '../../src/lib/store';
 import { Card, Dot, IconBtn, ProgressBar, Row, Screen, SectionTitle, Segmented, T } from '../../src/components/ui';
@@ -62,6 +62,16 @@ export default function Report() {
   const prevTotal = prevKeys.reduce((a, k) => a + daySec(k), 0);
   const diff = prevTotal ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
 
+  // 집중도 (웹 이탈 기록)
+  const awayCount = inRange.reduce((a, s) => a + (s.awayCount || 0), 0);
+  const awaySec = Math.min(total, inRange.reduce((a, s) => a + (s.awaySec || 0), 0));
+  const focusPct = total ? Math.round(((total - awaySec) / total) * 100) : 0;
+  const awayBySubject: Record<string, number> = {};
+  for (const x of inRange) if (x.awayCount) awayBySubject[x.subject] = (awayBySubject[x.subject] || 0) + x.awayCount;
+  const worstSubject = Object.entries(awayBySubject).sort((a, b) => b[1] - a[1])[0];
+  const prevAway = prevKeys.reduce((a, k) => a + (byDay[k] || []).reduce((b, s) => b + (s.awayCount || 0), 0), 0);
+  const showFocus = Platform.OS === 'web' || sessions.some((s) => s.awayCount !== undefined);
+
   return (
     <Screen title="공부 리포트" accent={t.section.support}>
       <Segmented
@@ -104,6 +114,66 @@ export default function Report() {
           {range === 'day' && <Stat label="목표 달성" value={`${Math.round((total / 60 / Math.max(1, settings.dailyGoalMin)) * 100)}%`} />}
         </Row>
       </Card>
+
+      {showFocus && (
+        <>
+          <SectionTitle title="집중도" />
+          <Card>
+            {total === 0 ? (
+              <T sub>기록이 없어요</T>
+            ) : (
+              <>
+                <Row gap={18}>
+                  <Stat label="이탈 횟수" value={`${awayCount}회`} />
+                  <Stat label="벗어난 시간" value={fmtShortDur(awaySec)} />
+                  <Stat label="순공 추정" value={fmtShortDur(total - awaySec)} />
+                  <Stat label="집중도" value={`${focusPct}%`} />
+                </Row>
+                <View style={{ marginTop: 10 }}>
+                  <ProgressBar value={focusPct / 100} color={focusPct >= 90 ? t.success : focusPct >= 75 ? t.warn : t.danger} />
+                </View>
+                {range !== 'day' && (
+                  <View style={{ flexDirection: 'row', marginTop: 12, gap: 3 }}>
+                    {keys.map((k, i) => {
+                      const c = (byDay[k] || []).reduce((a, s) => a + (s.awayCount || 0), 0);
+                      const has = daySec(k) > 0;
+                      return (
+                        <View key={k} style={{ flex: 1, alignItems: 'center' }}>
+                          <View
+                            style={{
+                              width: '100%',
+                              height: 18,
+                              borderRadius: 4,
+                              backgroundColor: !has ? t.surface2 : c === 0 ? alpha(t.success, 0.5) : alpha(t.danger, Math.min(0.9, 0.2 + c * 0.12)),
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {has && range === 'week' ? <Text style={{ fontSize: 10, fontWeight: '800', color: t.text }}>{c}</Text> : null}
+                          </View>
+                          {range === 'week' && (
+                            <Text style={{ fontSize: 10, color: t.textSub, marginTop: 2 }}>{['일', '월', '화', '수', '목', '금', '토'][days[i].getDay()]}</Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                <T size={12} sub style={{ marginTop: 10, lineHeight: 18 }}>
+                  {awayCount === 0
+                    ? '공부하는 동안 한 번도 다른 탭·창으로 가지 않았어요 👏'
+                    : `${worstSubject ? `'${worstSubject[0]}' 공부할 때 가장 많이 벗어났어요 (${worstSubject[1]}회). ` : ''}${
+                        range !== 'day' && prevAway ? `지난 기간보다 ${awayCount <= prevAway ? `${prevAway - awayCount}회 줄었어요` : `${awayCount - prevAway}회 늘었어요`}.` : ''
+                      }`}
+                </T>
+                <T size={11} faint style={{ marginTop: 6 }}>
+                  웹에서 공부 타이머가 도는 동안 3초 넘게 다른 탭·창으로 간 것을 셉니다
+                </T>
+              </>
+            )}
+          </Card>
+        </>
+      )}
 
       {range === 'day' && (
         <>

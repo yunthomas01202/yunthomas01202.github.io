@@ -4,6 +4,7 @@ import type { Task } from '../../lib/types';
 import { MIN, addDays, fmtKDate, fmtTime, parseYmd, ymd } from '../../lib/date';
 import { haptic, toast } from '../../components/ui';
 import { busyOf, findFreeSlot, nextFreeSlot, taskXP } from './logic';
+import { scheduleBusy, scheduleBusyAhead } from './schedules';
 
 export function setTaskDone(t: Task, done: boolean) {
   if (done) {
@@ -37,7 +38,7 @@ export function scheduleTaskOnDay(id: string, day: string) {
     d.setHours(keep.getHours(), keep.getMinutes(), 0, 0);
     start = d.getTime();
   } else {
-    start = findFreeSlot(day, dur, busyOf(others), s.settings, { preferFrom: 16 * 60, preferTo: 23 * 60 });
+    start = findFreeSlot(day, dur, busyOf(others, scheduleBusy(day, day)), s.settings, { preferFrom: 16 * 60, preferTo: 23 * 60 });
   }
   if (start === null) {
     toast('그 날엔 빈 시간이 없어요');
@@ -93,11 +94,11 @@ export function addStarterBefore(t: Task) {
   let start: number | null = null;
   if (t.start) {
     const cand = t.start - 5 * MIN;
-    const busy = busyOf(Object.values(s.tasks).filter((x) => x.id !== t.id));
+    const busy = busyOf(Object.values(s.tasks).filter((x) => x.id !== t.id), scheduleBusy(cand, cand));
     const clash = busy.some((b) => b[0] < cand + 5 * MIN && cand < b[1]);
     start = clash ? null : cand;
   }
-  if (start === null) start = nextFreeSlot(5, busyOf(Object.values(s.tasks)), s.settings);
+  if (start === null) start = nextFreeSlot(5, busyOf(Object.values(s.tasks), scheduleBusyAhead(8)), s.settings);
   add('tasks', {
     seasonId: t.seasonId,
     subjectId: t.subjectId,
@@ -140,7 +141,7 @@ export function splitTask(t: Task) {
 export function rescheduleToNext(t: Task, reason?: string): number | null {
   const s = getState();
   const dur = t.start && t.end ? Math.round((t.end - t.start) / MIN) : t.estMin;
-  const busy = busyOf(Object.values(s.tasks).filter((x) => x.id !== t.id && x.status === 'todo'));
+  const busy = busyOf(Object.values(s.tasks).filter((x) => x.id !== t.id && x.status === 'todo'), scheduleBusyAhead(8));
   const start = nextFreeSlot(dur, busy, s.settings);
   update('tasks', t.id, {
     start,

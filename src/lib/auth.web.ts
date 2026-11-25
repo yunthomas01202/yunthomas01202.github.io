@@ -60,3 +60,8 @@ export async function signOut() {
   clearDriveToken();
   await fbSignOut(webAuth());
 }
+
+/** 웹은 Firebase 로그인만 지원해요 (기기 전용 모드는 안드로이드 앱 전용) */
+export async function startLocalMode() {
+  throw new Error('웹에서는 Google 로그인이 필요해요');
+}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024">
+  <clipPath id="c"><rect width="1024" height="1024" rx="230"/></clipPath>
+  <g clip-path="url(#c)">
+    <defs><radialGradient id="g" cx="0.35" cy="0.3" r="0.9">
+    <stop offset="0" stop-color="#3B2F9E"/><stop offset="0.6" stop-color="#1F1760"/><stop offset="1" stop-color="#120D3A"/>
+  </radialGradient></defs>
+  <rect width="1024" height="1024" fill="url(#g)"/>
+  <g transform="translate(512 512) scale(1.25) translate(-512 -512)">  <defs>
+    <linearGradient id="nib2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFD27A"/><stop offset="1" stop-color="#FF9F43"/>
+    </linearGradient>
+    <linearGradient id="leaf2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3DDC97"/><stop offset="1" stop-color="#B8F5A0"/>
+    </linearGradient>
+  </defs>
+  <!-- time arc (3/4 ring) with a dot = progress -->
+  <path d="M512 232 A280 280 0 1 1 232 512" fill="none" stroke="#8E86FF" stroke-opacity="0.55" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="232" cy="512" r="26" fill="#FFD27A"/>
+  <!-- pen nib, pointing down -->
+  <path d="M512 780 L400 560 Q392 470 452 420 L572 420 Q632 470 624 560 Z" fill="url(#nib2)"/>
+  <rect x="440" y="372" width="144" height="58" rx="18" fill="#FFE3A8"/>
+  <path d="M512 780 L512 600" stroke="#2A1F66" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="512" cy="585" r="20" fill="#2A1F66"/>
+  <!-- sprout growing out of the nib -->
+  <path d="M512 380 C512 330 512 300 512 268" stroke="#3DDC97" stroke-width="18" stroke-linecap="round" fill="none"/>
+  <path d="M512 300 C540 230 620 210 676 226 C660 290 590 330 512 300 Z" fill="url(#leaf2)"/>
+  <path d="M512 330 C488 276 430 262 388 276 C402 324 456 350 512 330 Z" fill="url(#leaf2)" opacity="0.85"/></g>
+  </g>
+</svg>
